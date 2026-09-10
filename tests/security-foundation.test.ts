@@ -5,6 +5,7 @@ import {PGlite} from '@electric-sql/pglite'
 import {ownsSite} from '../src/lib/owner-access'
 import {createLeadSubmitHandler} from '../src/lib/lead-intake'
 import {siteUpdates} from '../src/lib/site-content'
+import {SITE_TEMPLATES,isSiteTemplate} from '../src/components/templates/types'
 import type {SupabaseClient} from '@supabase/supabase-js'
 
 const migration=readFileSync('supabase/migrations/202609100900_owner_leads_foundation.sql','utf8')
@@ -131,6 +132,35 @@ test('website updates validate links and preserve verified factual scalars witho
   const result=siteUpdates({owner_id:'attacker',email:'attacker@example.invalid',business_facts:{verified:true,existingWebsite:null},contact_email:'info@example.invalid'})
   assert.equal('owner_id' in result,false);assert.equal('email' in result,false)
   assert.deepEqual(result.business_facts,{verified:true,existingWebsite:null})
+})
+
+test('the shared design catalog accepts six current templates and rejects legacy or malformed choices',()=>{
+  const expected=['summit','atelier','ledger','win95','myspace','receipt']
+  assert.deepEqual(SITE_TEMPLATES.map(template=>template.id),expected)
+  for(const template of expected) {
+    assert.equal(isSiteTemplate(template),true)
+    assert.equal(siteUpdates({template}).template,template)
+  }
+  for(const template of ['pokemon','aim','bold','modern','professional','unknown','Summit','',null,95,['summit'],{toString:()=> 'summit'}]) {
+    assert.throws(()=>siteUpdates({template}),/supported/)
+  }
+  assert.equal('template' in siteUpdates({tagline:'A new headline'}),false)
+})
+
+test('owner intake persists every current template and rejects unsupported choices before writing',async()=>{
+  const {saveOwnedIntake}=await import('../src/lib/site-intake')
+  const user={id:'owner-a',email:'owner@example.invalid',email_confirmed_at:'2026-01-01'} as import('@supabase/supabase-js').User
+  const writes:Record<string,unknown>[]=[]
+  const db={from:()=>({insert:async(payload:Record<string,unknown>)=>{writes.push(payload);return {error:null}}})} as unknown as SupabaseClient
+  for(const {id:template} of SITE_TEMPLATES) {
+    await saveOwnedIntake({businessName:`Design ${template}`,city:'Austin',template},{user,db})
+    assert.equal(writes.at(-1)?.template,template)
+    assert.equal(writes.at(-1)?.owner_id,user.id)
+    assert.equal(writes.at(-1)?.hosting_status,'preview')
+  }
+  assert.equal(writes.length,6)
+  await assert.rejects(saveOwnedIntake({businessName:'Unsupported',template:'aim'},{user,db}),/supported/)
+  assert.equal(writes.length,6)
 })
 
 test('intake rejects another owner slug before mutation and ignores submitted ownership',async()=>{

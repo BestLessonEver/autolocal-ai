@@ -1120,3 +1120,8 @@
   height: 300%;
   transform: scale(0.333333);
 }
+
+@media (max-width: 700px) {
+  .templateThumb { height: 420px; }
+  .templateThumb iframe { width: 100%; height: 100%; transform: none; }
+}

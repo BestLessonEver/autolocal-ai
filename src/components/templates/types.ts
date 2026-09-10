@@ -45,15 +45,27 @@ export interface TemplateProps {
   data: PreviewData
 }
 
-export type TemplateName = 'summit' | 'atelier' | 'ledger' | 'bold' | 'elegant' | 'professional' | 'clutch' | 'artika' | 'bde'
+export type TemplateName = SiteTemplateName | 'bold' | 'elegant' | 'professional' | 'clutch' | 'artika' | 'bde'
 
 export type ProfessionalTemplateName = 'summit' | 'atelier' | 'ledger'
+export type SiteTemplateName = ProfessionalTemplateName | 'win95' | 'myspace' | 'receipt'
 
 export const PROFESSIONAL_TEMPLATES = [
   { id: 'summit', name: 'Summit', audience: 'Home & local services', description: 'Confident type, architectural lines, and a clear path to an inquiry.' },
   { id: 'atelier', name: 'Atelier', audience: 'Personal services & studios', description: 'Warm editorial layouts, expressive photography, and room to breathe.' },
   { id: 'ledger', name: 'Ledger', audience: 'Experts & professional services', description: 'Refined typography and a considered layout that puts your expertise first.' },
 ] as const
+
+export const SITE_TEMPLATES = [
+  ...PROFESSIONAL_TEMPLATES.map(template => ({ ...template, style: 'professional' as const })),
+  { id: 'win95', name: 'Desktop 95', audience: 'Creative shops & playful services', description: 'A nostalgic desktop, beveled windows, and a very modern way to get in touch.', style: 'playful' },
+  { id: 'myspace', name: 'Guestbook', audience: 'Artists, studios & neighborhood favorites', description: 'A colorful profile full of personality, with your work and services up front.', style: 'playful' },
+  { id: 'receipt', name: 'Receipt', audience: 'Independent shops & straightforward services', description: 'A crisp paper receipt that turns your services into a memorable little menu.', style: 'playful' },
+] as const
+
+export function isSiteTemplate(value: unknown): value is SiteTemplateName {
+  return typeof value === 'string' && SITE_TEMPLATES.some(template => template.id === value)
+}
 
 export function categoryToProfessionalTemplate(category: string): ProfessionalTemplateName {
   if (/salon|spa|beauty|hair|wellness|fitness|yoga|studio|restaurant|cafe/i.test(category)) return 'atelier'

@@ -59,7 +59,9 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  min-height: 43px;
+  min-height: 44px;
+  min-width: 0;
+  font-size: 16px;
   padding: 10px 13px;
   border: 0;
   background: none;
@@ -476,6 +478,7 @@
 }
 .label {
   display: grid;
+  min-width: 0;
   gap: 7px;
   font-size: 12px;
   color: #526d46;
@@ -487,7 +490,7 @@
 }
 .formRow {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 18px;
 }
 .editSection {

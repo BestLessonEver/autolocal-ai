@@ -1,9 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // Static HTML generators for deployed client sites
 // Each template mirrors its React counterpart in src/components/templates/
-import { PROFESSIONAL_CSS, escapeHtml, isProfessionalTemplate, renderProfessionalSite, resolveSiteUrl, safeWebUrl, siteStructuredData, type SiteRenderOptions } from '@/components/templates/professional-renderer'
+import { PROFESSIONAL_CSS, escapeHtml, renderProfessionalSite, resolveSiteUrl, safeWebUrl, siteStructuredData, type SiteRenderOptions } from '@/components/templates/professional-renderer'
 import { inquiryRuntimeScript } from '@/components/templates/inquiry-runtime'
-import { categoryToProfessionalTemplate } from '@/components/templates/types'
+import { categoryToProfessionalTemplate, isSiteTemplate } from '@/components/templates/types'
 
 interface SiteData {
   slug: string
@@ -1191,8 +1191,8 @@ const TEMPLATE_MAP: Record<string, (d: SiteData) => string> = {
 /** Archived generators are retained for reference; production exports use the tested shared renderer. */
 function generateArchivedStaticHtml(data: any, template: string, options: SiteRenderOptions = {}): string {
   const selected = template || categoryToProfessionalTemplate(data.category || '')
-  if (isProfessionalTemplate(selected) || !(selected in TEMPLATE_MAP)) {
-    return generateProfessionalHtml(data, isProfessionalTemplate(selected) ? selected : categoryToProfessionalTemplate(data.category || ''), options)
+  if (isSiteTemplate(selected) || !(selected in TEMPLATE_MAP)) {
+    return generateProfessionalHtml(data, isSiteTemplate(selected) ? selected : categoryToProfessionalTemplate(data.category || ''), options)
   }
   // Keep older designs available, but exclude unconfirmed testimonials and private account emails.
   data = { ...data, email: null, reviews: data.reviews_verified ? data.reviews || [] : [],
@@ -1323,7 +1323,7 @@ ${logo ? `<link rel="icon" href="${e(logo)}">` : ''}
 
 /** Files for one public site; add service URLs only when actual service pages exist. */
 export function generateStaticHtml(data: any, template: string, options: SiteRenderOptions = {}): string {
-  return generateProfessionalHtml(data, isProfessionalTemplate(template) ? template : categoryToProfessionalTemplate(data.category || ''), options)
+  return generateProfessionalHtml(data, isSiteTemplate(template) ? template : categoryToProfessionalTemplate(data.category || ''), options)
 }
 
 export function generateStaticSiteFiles(data: any, template: string, options: SiteRenderOptions = {}): { file: string; data: string }[] {

@@ -7,11 +7,12 @@ import { renderProfessionalSite, resolveSiteUrl, siteStructuredData } from '../s
 import { inquiryRuntimeScript } from '../src/components/templates/inquiry-runtime'
 import { publicSiteData } from '../src/components/templates/public-site-data'
 import { TEMPLATE_DEMOS } from '../src/components/templates/demo-data'
+import { SITE_TEMPLATES } from '../src/components/templates/types'
 
 const record = { ...TEMPLATE_DEMOS.summit, demo: false, slug: 'real-test-business', business_name: 'Example & Sons', tagline: 'Help for your home.', description: 'Repairs and maintenance in the local area.', hosting_status: 'active', deploy_status: 'live', phone: '(713) 555-0199', email: 'private-owner@example.test', contact_email: 'public@example.test', website_current: 'https://old-provider.example.test', custom_domain: null, domain_status: null, city: 'Houston', state: 'TX', address: '123 Example Street', faq: [], hero_image_url: null, image_caption: null }
 
-test('three families use identical preview/export content and working anchor destinations', () => {
-  for (const family of ['summit', 'atelier', 'ledger']) {
+test('all supported designs use identical preview/export content and working anchor destinations', () => {
+  for (const { id: family } of SITE_TEMPLATES) {
     const html = generateStaticHtml(record, family, { apiBaseUrl: 'https://app.example.test' })
     const $ = load(html)
     const preview = load(renderProfessionalSite(record, family, { mode: 'live', apiBaseUrl: 'https://app.example.test' }))
@@ -20,6 +21,14 @@ test('three families use identical preview/export content and working anchor des
     assert.equal($(`.al-${family}`).length, 1)
     assert.equal($('form[data-al-inquiry]').attr('data-endpoint'), 'https://app.example.test/api/leads/submit')
     assert.equal($('form').attr('data-mode'), 'live')
+    assert.equal($('form[data-al-inquiry]').length, 1)
+    for (const name of ['name', 'email', 'phone', 'message', 'service']) {
+      assert.equal($(`form [name="${name}"]`).length, 1, `Missing ${name} field in ${family}`)
+      assert.equal($(`form [name="${name}"]`).closest('label').length, 1, `Unlabeled ${name} field in ${family}`)
+    }
+    assert.equal($('form [name="email"]').attr('type'), 'email')
+    assert.equal($('form [name="phone"]').attr('type'), 'tel')
+    assert.equal($('form [data-form-status]').attr('role'), 'status')
     assert.equal($('a[href="tel:+7135550199"]').length, 0)
     assert.ok($('a[href="tel:7135550199"]').length)
     assert.ok($('a[href="mailto:public@example.test"]').length)
@@ -33,18 +42,20 @@ test('three families use identical preview/export content and working anchor des
 })
 
 test('exported search files use the actual intended site and truthful service entities', () => {
-  const files = generateStaticSiteFiles(record, 'summit', { siteUrl: 'https://client.example.test' })
-  assert.deepEqual(files.map(file => file.file), ['index.html', 'robots.txt', 'sitemap.xml'])
-  const $ = load(files[0].data)
-  assert.equal($('link[rel=canonical]').attr('href'), 'https://client.example.test')
-  assert.equal($('meta[name=autolocal-site]').attr('content'), record.slug)
-  assert.equal($('meta[name=robots]').attr('content'), 'index,follow')
-  assert.match(files[1].data, /Sitemap: https:\/\/client.example.test\/sitemap.xml/)
-  assert.match(files[2].data, /<loc>https:\/\/client.example.test\/<\/loc>/)
-  const graph = JSON.parse($('script[type="application/ld+json"]').html()!)['@graph']
-  assert.equal(graph[0]['@type'], 'LocalBusiness')
-  assert.equal(graph.filter((item: { '@type': string }) => item['@type'] === 'Service').length, record.services.length)
-  assert.ok(!files[0].data.includes('old-provider.example.test'))
+  for (const { id: family } of SITE_TEMPLATES) {
+    const files = generateStaticSiteFiles(record, family, { siteUrl: 'https://client.example.test' })
+    assert.deepEqual(files.map(file => file.file), ['index.html', 'robots.txt', 'sitemap.xml'])
+    const $ = load(files[0].data)
+    assert.equal($('link[rel=canonical]').attr('href'), 'https://client.example.test')
+    assert.equal($('meta[name=autolocal-site]').attr('content'), record.slug)
+    assert.equal($('meta[name=robots]').attr('content'), 'index,follow')
+    assert.match(files[1].data, /Sitemap: https:\/\/client.example.test\/sitemap.xml/)
+    assert.match(files[2].data, /<loc>https:\/\/client.example.test\/<\/loc>/)
+    const graph = JSON.parse($('script[type="application/ld+json"]').html()!)['@graph']
+    assert.equal(graph[0]['@type'], 'LocalBusiness')
+    assert.equal(graph.filter((item: { '@type': string }) => item['@type'] === 'Service').length, record.services.length)
+    assert.ok(!files[0].data.includes('old-provider.example.test'))
+  }
   assert.equal(resolveSiteUrl({ ...record, custom_domain: 'pending.example.test', domain_status: 'verifying' }), 'https://real-test-business.autolocal.ai')
   assert.equal(resolveSiteUrl({ ...record, custom_domain: 'ready.example.test', domain_status: 'active' }), 'https://ready.example.test')
 })
@@ -52,33 +63,52 @@ test('exported search files use the actual intended site and truthful service en
 test('unconfirmed reviews, hidden addresses, owner credentials and invented facts stay absent', () => {
   const source = { ...record, id: 'private-id', owner_id: 'private-owner', stripe_customer_id: 'cus_secret', discord_webhook_url: 'secret', access_token: 'secret', show_address: false, reviews_verified: false, reviews: [{ author: 'Invented Person', text: 'Fabricated praise', rating: 5, date: '' }], google_rating: 5, google_review_count: 999 }
   const publicData = publicSiteData(source)
-  const html = generateStaticHtml(publicData, 'ledger')
-  for (const secret of ['private-id', 'private-owner', 'cus_secret', 'Fabricated praise', 'Invented Person', '999', record.address, record.email]) assert.ok(!html.includes(secret), `Leaked ${secret}`)
+  for (const { id: family } of SITE_TEMPLATES) {
+    const html = generateStaticHtml(publicData, family)
+    for (const secret of ['private-id', 'private-owner', 'cus_secret', 'Fabricated praise', 'Invented Person', record.address, record.email]) assert.ok(!html.includes(secret), `Leaked ${secret} in ${family}`)
+    const $ = load(html)
+    assert.ok(!$('.al-site').text().includes('999'))
+    assert.doesNotMatch($('.al-site').text(), /licensed|five-star|SATISFACTION\s*GUARANTEED|ONLINE!|Visitors:\s*\d|TXN #/i)
+  }
   assert.equal(publicData.address, null)
   assert.ok(!JSON.stringify(publicData).includes('secret'))
   assert.ok(!JSON.stringify(siteStructuredData(publicData, 'https://example.test')).includes(record.address))
-  assert.ok(!html.includes('licensed'))
-  assert.ok(!html.includes('five-star'))
 })
 
 test('untrusted text cannot break HTML, scripts, or image URLs', () => {
   const attack = '</script><script>alert(1)</script><img src=x onerror=alert(2)>'
-  const html = generateStaticHtml({ ...record, business_name: attack, description: attack, contact_email: '" onmouseover="alert(1)', hero_image_url: 'javascript:alert(1)', logo_url: 'https://example.test/image?key=secret', brand_color_primary: 'red; background:url(javascript:alert(1))' }, 'atelier')
-  const $ = load(html)
-  assert.equal($('[onerror],[onmouseover]').length, 0)
-  assert.equal($('img[src^="javascript:"]').length, 0)
-  assert.ok(!html.includes('key=secret'))
-  assert.equal($('script').length, 2)
-  assert.equal(JSON.parse($('script[type="application/ld+json"]').html()!)['@graph'][0].name, attack)
+  for (const { id: family } of SITE_TEMPLATES) {
+    const html = generateStaticHtml({ ...record, business_name: attack, description: attack, contact_email: '" onmouseover="alert(1)', hero_image_url: 'javascript:alert(1)', logo_url: 'https://example.test/image?key=secret', gallery_images: ['javascript:alert(1)', 'https://example.test/photo?access_token=secret'], brand_color_primary: 'red; background:url(javascript:alert(1))', services: [{ name: attack, description: attack, price: attack }], faq: [{ question: attack, answer: attack }], hours: { Monday: attack } }, family)
+    const $ = load(html)
+    assert.equal($('[onerror],[onmouseover]').length, 0)
+    assert.equal($('img[src^="javascript:"]').length, 0)
+    assert.ok(!html.includes('key=secret'))
+    assert.ok(!html.includes('access_token=secret'))
+    assert.equal($('script').length, 2)
+    assert.equal(JSON.parse($('script[type="application/ld+json"]').html()!)['@graph'][0].name, attack)
+    assert.equal($('a[data-inquiry-service]').first().attr('data-inquiry-service'), attack)
+    assert.equal($('select[name="service"] option').last().text(), attack)
+  }
 })
 
 test('demo output cannot be indexed and has no real contact links', () => {
-  for (const family of ['summit', 'atelier', 'ledger'] as const) {
+  for (const { id: family } of SITE_TEMPLATES) {
     const files = generateStaticSiteFiles(TEMPLATE_DEMOS[family], family)
     const $ = load(files[0].data)
     assert.equal($('form').attr('data-mode'), 'demo')
     assert.equal($('meta[name=robots]').attr('content'), 'noindex,nofollow')
     assert.equal($('a[href^="tel:"],a[href^="mailto:"]').length, 0)
+    assert.match(files[1].data, /Disallow: \//)
+    assert.ok(!files[2].data.includes('<url>'))
+  }
+})
+
+test('explicit private preview mode stays non-indexed across every export', () => {
+  for (const { id: family } of SITE_TEMPLATES) {
+    const files = generateStaticSiteFiles(record, family, { mode: 'preview' })
+    const $ = load(files[0].data)
+    assert.equal($('form[data-al-inquiry]').attr('data-mode'), 'preview')
+    assert.equal($('meta[name=robots]').attr('content'), 'noindex,nofollow')
     assert.match(files[1].data, /Disallow: \//)
     assert.ok(!files[2].data.includes('<url>'))
   }
@@ -141,8 +171,15 @@ test('demo and private preview runtime never submit to the network', async () =>
 })
 
 test('service inquiry links carry the chosen service into the shared form', async () => {
-  const html = load(generateStaticHtml(record, 'summit'))
-  assert.equal(html('a[data-inquiry-service]').first().attr('data-inquiry-service'), record.services[0].name)
+  for (const { id: family } of SITE_TEMPLATES) {
+    const html = load(generateStaticHtml(record, family))
+    const choices = html('select[name="service"] option').map((_, option) => html(option).text()).get()
+    assert.equal(html('a[data-inquiry-service]').first().attr('data-inquiry-service'), record.services[0].name)
+    html('a[data-inquiry-service]').each((_, link) => {
+      assert.equal(html(link).attr('href'), '#contact')
+      assert.ok(choices.includes(html(link).attr('data-inquiry-service')!), `Missing service choice in ${family}`)
+    })
+  }
   const example = formHarness('demo', {})
   await example.chooseService()
   assert.equal(example.serviceChoice.value, 'Home repairs')

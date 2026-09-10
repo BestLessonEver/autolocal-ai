@@ -398,3 +398,11 @@
   height: 500%;
   transform: scale(0.2);
 }
+
+@media (max-width: 700px) {
+  .designs { grid-template-columns: 1fr; gap: 20px; }
+  .designPreview { height: 340px; }
+  .design iframe { width: 100%; height: 100%; transform: none; }
+  .design strong { padding: 16px 16px 0; font-size: 18px; }
+  .design span { padding: 6px 16px 18px; font-size: 14px; }
+}

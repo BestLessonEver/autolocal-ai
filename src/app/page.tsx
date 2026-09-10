@@ -304,9 +304,9 @@ export default function HomePage() {
                   "Warm and expressive. For services with a personal touch.",
                 ],
                 [
-                  "ledger",
-                  "Ledger",
-                  "Thoughtful and assured. For advice people can trust.",
+                  "win95",
+                  "Desktop 95",
+                  "A nostalgic desktop. For businesses with a playful side.",
                 ],
               ].map(([id, name, description]) => (
                 <Link

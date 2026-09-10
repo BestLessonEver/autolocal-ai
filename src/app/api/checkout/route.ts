@@ -6,7 +6,7 @@ import { appOrigin, requireCapability } from '@/lib/integration-config'
 import { getBillingPlans } from '@/lib/billing-plans'
 import { checkAvailability, normalizeDomain } from '@/lib/vercel-domains'
 import { createOwnerCheckout } from '@/lib/checkout-session'
-import { isProfessionalTemplate } from '@/components/templates/professional-renderer'
+import { isSiteTemplate } from '@/components/templates/types'
 
 export async function POST(req: Request) {
   try {
@@ -22,7 +22,7 @@ export async function POST(req: Request) {
     const plan = subscription ? (await getBillingPlans(stripe)).find(item => item.key === (product === 'managed' ? 'managed' : 'hosting')) : undefined
     if (subscription && !plan) throw new ApiError(503, 'This plan is not available for purchase.')
     const hosting = plan?.includesHosting === true
-    if (hosting && !isProfessionalTemplate(site.template)) throw new ApiError(409, 'Choose and review a current website design before activating hosting.')
+    if (hosting && !isSiteTemplate(site.template)) throw new ApiError(409, 'Choose and review a current website design before activating hosting.')
     metadata.includes_hosting = String(hosting)
     metadata.plan = product === 'managed' ? 'managed' : 'hosting'
     if (hosting && ['active', 'pending_cancel'].includes(site.hosting_status)) throw new ApiError(409, 'Hosting is already active. Manage it in billing.')

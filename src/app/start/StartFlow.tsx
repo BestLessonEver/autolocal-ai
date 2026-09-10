@@ -26,6 +26,7 @@ import {
 } from "@/lib/pending-draft";
 import m from "@/components/marketing.module.css";
 import s from "./start.module.css";
+import { SITE_TEMPLATES, isSiteTemplate } from "@/components/templates/types";
 type Service = {
   name: string;
   description: string;
@@ -108,6 +109,8 @@ export default function StartFlow() {
   useEffect(() => {
     // Hydrate browser-only draft storage after the initial server-matched frame.
     const frame = requestAnimationFrame(() => {
+      const requestedTemplate = params.get("template");
+      const selectedTemplate = isSiteTemplate(requestedTemplate) ? requestedTemplate : null;
       try {
         const pending = params.get("draft");
         const saved = pending
@@ -122,7 +125,12 @@ export default function StartFlow() {
           typeof saved.businessName === "string" &&
           Array.isArray(saved.services)
         ) {
-          setDraft({ ...initial, ...saved, confirmed: false });
+          setDraft({
+            ...initial,
+            ...saved,
+            template: selectedTemplate || (isSiteTemplate(saved.template) ? saved.template : "summit"),
+            confirmed: false,
+          });
           setStep(
             Number.isInteger(saved._step)
               ? Math.min(3, Math.max(0, saved._step))
@@ -134,14 +142,11 @@ export default function StartFlow() {
             businessName: params.get("name") || "",
             city: params.get("city") || "",
             contactEmail: params.get("email") || "",
-            template: ["summit", "atelier", "ledger"].includes(
-              params.get("template") || "",
-            )
-              ? params.get("template")!
-              : "summit",
+            template: selectedTemplate || "summit",
           }));
       } catch {
-        /* A corrupt local draft must not block starting again. */
+        // A design selected from the gallery still applies if storage is unavailable.
+        if (selectedTemplate) setDraft(d => ({ ...d, template: selectedTemplate }));
       }
       setReady(true);
       try {
@@ -761,11 +766,7 @@ export default function StartFlow() {
                   your photos in your workspace.
                 </p>
                 <div className={s.designs}>
-                  {[
-                    ["summit", "Summit", "Confident & practical"],
-                    ["atelier", "Atelier", "Warm & personal"],
-                    ["ledger", "Ledger", "Calm & considered"],
-                  ].map(([id, name, label]) => (
+                  {SITE_TEMPLATES.map(({id, name, audience: label}) => (
                     <button
                       type="button"
                       key={id}
