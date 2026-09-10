@@ -22,6 +22,18 @@ export function deploymentState(deployment: Pick<Deployment, 'readyState' | 'ali
   return deployment.readyState === 'READY' ? 'ready' : 'pending'
 }
 
+export async function promoteDeployment(projectId: string, deploymentId: string) {
+  const response = await vercelRequest(`/v10/projects/${encodeURIComponent(projectId)}/promote/${encodeURIComponent(deploymentId)}`, { method: 'POST' })
+  if ([200, 201, 202].includes(response.status)) return
+  if (response.status === 409) {
+    // A project's first deployment is already production. A retry may also
+    // reach this state after promotion succeeded but saving the result failed.
+    const project = await vercelJson<{ id: string; targets?: { production?: { id: string } } }>(`/v9/projects/${encodeURIComponent(projectId)}`)
+    if (project.id === projectId && project.targets?.production?.id === deploymentId) return
+  }
+  throw new JobError(`Hosting promotion returned HTTP ${response.status}`)
+}
+
 export async function attachDomain(domain: string, projectId: string) {
   const path = `/v10/projects/${encodeURIComponent(projectId)}/domains`
   const response = await vercelRequest(path, { method: 'POST', body: JSON.stringify({ name: domain }) })
