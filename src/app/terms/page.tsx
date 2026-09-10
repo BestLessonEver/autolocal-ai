@@ -1,119 +1,127 @@
-import { Metadata } from 'next';
-
+import type { Metadata } from "next";
+import Link from "next/link";
+import MarketingNav from "@/components/MarketingNav";
+import MarketingFooter from "@/components/MarketingFooter";
+import m from "@/components/marketing.module.css";
 export const metadata: Metadata = {
-  title: 'Terms & Conditions | AutoLocal.ai',
-  description: 'AutoLocal.ai terms and conditions of service.',
+  title: "Terms of service",
+  alternates: { canonical: "/terms" },
 };
-
-export default function TermsPage() {
+export default function Terms() {
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-gray-300">
-      <div className="max-w-3xl mx-auto px-4 py-20">
-        <h1 className="text-4xl font-black text-white mb-2">Terms &amp; Conditions</h1>
-        <p className="text-gray-500 mb-12">Last updated: March 10, 2026</p>
-
-        <div className="space-y-8 text-sm leading-relaxed">
-          <section>
-            <h2 className="text-xl font-bold text-white mb-3">1. Agreement to Terms</h2>
-            <p>By accessing or using AutoLocal.ai (&quot;Service&quot;), operated by Futureproof Music, Inc. (&quot;Company,&quot; &quot;we,&quot; &quot;us&quot;), you agree to be bound by these Terms &amp; Conditions. If you do not agree, do not use the Service.</p>
-          </section>
-
-          <section>
-            <h2 className="text-xl font-bold text-white mb-3">2. Description of Service</h2>
-            <p>AutoLocal.ai provides automated custom website creation and hosting for local businesses. We pull publicly available information from Google Business Profiles (reviews, photos, hours) to generate website previews. You may also submit your own content manually.</p>
-          </section>
-
-          <section>
-            <h2 className="text-xl font-bold text-white mb-3">3. Pricing &amp; Payments</h2>
-            <ul className="list-disc list-inside space-y-1 ml-2">
-              <li>Website creation is free</li>
-              <li>Hosting is $9/month, billed monthly via Stripe</li>
-              <li>First month is free — no credit card required for preview</li>
-              <li>Premium features may be available as add-ons at posted prices</li>
-              <li>You may cancel hosting at any time with no cancellation fee</li>
-              <li>Refunds are handled on a case-by-case basis — contact <a href="mailto:support@autolocal.ai" className="text-indigo-400 hover:underline">support@autolocal.ai</a></li>
-            </ul>
-          </section>
-
-          <section>
-            <h2 className="text-xl font-bold text-white mb-3">4. Your Content</h2>
-            <p>You retain ownership of all content you provide (photos, text, logos). By submitting content, you grant us a license to display it on your website. We may use publicly available Google Business Profile data (reviews, photos, hours) that is already visible to the public.</p>
-          </section>
-
-          <section>
-            <h2 className="text-xl font-bold text-white mb-3">5. Hosting &amp; Uptime</h2>
-            <p>We aim for 99.9% uptime but do not guarantee uninterrupted service. We are not liable for downtime caused by third-party providers, scheduled maintenance, or circumstances beyond our control.</p>
-          </section>
-
-          <section>
-            <h2 className="text-xl font-bold text-white mb-3">6. Cancellation</h2>
-            <p>You may cancel your hosting subscription at any time. Upon cancellation:</p>
-            <ul className="list-disc list-inside space-y-1 ml-2">
-              <li>Your website will remain active until the end of your current billing period</li>
-              <li>After that, your website will be taken offline</li>
-              <li>We retain your site data for 30 days in case you want to reactivate</li>
-              <li>After 30 days, all data is permanently deleted</li>
-            </ul>
-          </section>
-
-          <section>
-            <h2 className="text-xl font-bold text-white mb-3">7. SMS/Text Messaging Program</h2>
-            <p className="mb-2">By opting in to receive SMS messages from AutoLocal.ai, you agree to the following:</p>
-            <ul className="list-disc list-inside space-y-1 ml-2">
-              <li><strong className="text-white">Program name:</strong> AutoLocal.ai Website Updates</li>
-              <li><strong className="text-white">Program description:</strong> Receive text messages about your website status, updates, reminders, and occasional promotional offers from AutoLocal.ai</li>
-              <li><strong className="text-white">Message frequency:</strong> Message frequency varies. No more than 10 messages per month.</li>
-              <li><strong className="text-white">Message and data rates may apply.</strong> Check with your carrier for details.</li>
-              <li><strong className="text-white">Opt-out:</strong> Reply <strong className="text-white">STOP</strong> at any time to unsubscribe from SMS messages</li>
-              <li><strong className="text-white">Help:</strong> Reply <strong className="text-white">HELP</strong> for help, or contact <a href="mailto:support@autolocal.ai" className="text-indigo-400 hover:underline">support@autolocal.ai</a></li>
-              <li>Consent to receive SMS messages is not a condition of purchase or use of our services</li>
-              <li>Your phone number and consent will not be shared with any third parties for their marketing purposes</li>
-            </ul>
-            <p className="mt-2">Supported carriers include but are not limited to: AT&amp;T, T-Mobile, Verizon, Sprint, and all major US carriers.</p>
-          </section>
-
-          <section>
-            <h2 className="text-xl font-bold text-white mb-3">8. Acceptable Use</h2>
-            <p className="mb-2">You agree not to use AutoLocal.ai to:</p>
-            <ul className="list-disc list-inside space-y-1 ml-2">
-              <li>Create websites for illegal businesses or activities</li>
-              <li>Display content that is defamatory, obscene, or infringes on others&apos; rights</li>
-              <li>Impersonate another business or person</li>
-              <li>Engage in spam, phishing, or other malicious activities</li>
-            </ul>
-            <p className="mt-2">We reserve the right to suspend or terminate any website that violates these terms.</p>
-          </section>
-
-          <section>
-            <h2 className="text-xl font-bold text-white mb-3">9. Limitation of Liability</h2>
-            <p>To the maximum extent permitted by law, AutoLocal.ai and Futureproof Music, Inc. shall not be liable for any indirect, incidental, special, consequential, or punitive damages, including loss of profits, data, or business opportunities arising from your use of the Service.</p>
-          </section>
-
-          <section>
-            <h2 className="text-xl font-bold text-white mb-3">10. Intellectual Property</h2>
-            <p>The AutoLocal.ai platform, design templates, code, and branding are the property of Futureproof Music, Inc. You may not copy, modify, or distribute our platform or templates without permission.</p>
-          </section>
-
-          <section>
-            <h2 className="text-xl font-bold text-white mb-3">11. Changes to Terms</h2>
-            <p>We may update these terms from time to time. Continued use of the Service after changes constitutes acceptance of the new terms. We will notify you of material changes by email.</p>
-          </section>
-
-          <section>
-            <h2 className="text-xl font-bold text-white mb-3">12. Governing Law</h2>
-            <p>These terms are governed by the laws of the State of Texas. Any disputes shall be resolved in the courts of Galveston County, Texas.</p>
-          </section>
-
-          <section>
-            <h2 className="text-xl font-bold text-white mb-3">13. Contact</h2>
-            <p>Questions about these terms? Contact us at:</p>
-            <p className="mt-2">
-              Futureproof Music, Inc.<br />
-              Email: <a href="mailto:support@autolocal.ai" className="text-indigo-400 hover:underline">support@autolocal.ai</a>
-            </p>
-          </section>
-        </div>
-      </div>
+    <div className={m.surface}>
+      <MarketingNav />
+      <main className={m.prose}>
+        <h1>Terms of service</h1>
+        <p>Updated September 10, 2026</p>
+        <h2>Using AutoLocal</h2>
+        <p>
+          AutoLocal.ai is operated by Futureproof Music, Inc. By using the
+          service, you agree to these terms and our{" "}
+          <Link href="/privacy">privacy policy</Link>. You must be an adult
+          authorized to act for the business you manage.
+        </p>
+        <h2>Your website and business information</h2>
+        <p>
+          AutoLocal helps you prepare and host a business website, manage
+          inquiries, and use supported local visibility connections. You are
+          responsible for the accuracy of business facts and for permission to
+          use submitted text, photographs, logos, reviews, and other material.
+          Do not invent qualifications, reviews, service areas, or customer
+          results.
+        </p>
+        <p>
+          A saved preview is a draft. Review it before approving publication.
+          Publication, domain configuration, and provider verification are
+          separate steps, and an external provider may delay or reject a change.
+          Your existing website should remain available until its replacement
+          and domain transition are confirmed.
+        </p>
+        <h2>Prices, renewals, and cancellation</h2>
+        <p>
+          Preparing a website preview does not require payment. Available paid
+          plans, their included services, any trial, and the recurring billing
+          amount are shown before checkout. The plan and terms accepted in
+          checkout govern your purchase. Existing subscriptions keep their
+          agreed terms unless you accept a change.
+        </p>
+        <p>
+          Paid recurring plans renew at the agreed interval until cancelled. Use
+          the billing portal or contact us for account assistance. Cancellation
+          takes effect as shown in the billing portal; access to paid services
+          may end at that time. Refund requests are handled individually;
+          contact <a href="mailto:brian@autolocal.ai">brian@autolocal.ai</a>.
+          Any mandatory rights under applicable law still apply.
+        </p>
+        <h2>Domains and third-party accounts</h2>
+        <p>
+          You retain control of your existing domain and connected business
+          accounts. New domain registration is a separate purchase unless
+          explicitly included in your order. The current purchase flow registers
+          a domain for one year and does not enable automatic renewal.
+          Availability and price are rechecked before checkout; registration is
+          complete only after the registrar confirms it. A requested domain can
+          become unavailable. If registration fails after payment, contact us to
+          resolve the order or appropriate refund.
+        </p>
+        <p>
+          Google, Stripe, registrars, and hosting providers have their own terms
+          and availability requirements. Connecting an account grants the
+          permissions shown in that provider’s consent screen. Specific
+          business-profile changes require your approval. You can revoke a
+          connection, and you must tell us if your authority to manage a
+          business ends.
+        </p>
+        <h2>Search and customer outcomes</h2>
+        <p>
+          We prepare useful website content, technical search information, and
+          supported connection tools. We do not guarantee search rankings,
+          indexing, inclusion in AI answers, review growth, a number of
+          inquiries, or revenue. Those outcomes depend on the business,
+          competition, search providers, customer behavior, and follow-up.
+          Performance reports identify their sources and dates; missing data is
+          not a result of zero.
+        </p>
+        <h2>Inquiries and communications</h2>
+        <p>
+          Inquiries are saved for the business to review. Notification delivery
+          depends on the configured email provider and recipient systems, so
+          business owners should also check their inbox in AutoLocal. You remain
+          responsible for responding to customers, permission to contact them,
+          and how you use their information. Do not send spam, buy or fabricate
+          reviews, reward only positive reviews, or selectively suppress
+          negative feedback.
+        </p>
+        <h2>Acceptable use and intellectual property</h2>
+        <p>
+          Do not impersonate a business, access another owner’s account, publish
+          unlawful or infringing content, or use the service for phishing,
+          harassment, fraud, or malicious activity. We may restrict access for
+          violations or to protect the service. You retain your submitted
+          business content and grant us the rights needed to store, display, and
+          publish it as requested. The AutoLocal platform, code, templates, and
+          branding remain the property of Futureproof Music, Inc. or their
+          respective licensors.
+        </p>
+        <h2>Service limits</h2>
+        <p>
+          To the maximum extent permitted by law, AutoLocal and Futureproof
+          Music, Inc. are not liable for indirect, incidental, special,
+          consequential, or punitive damages, including lost profits, data, or
+          business opportunities arising from use of the service. No provision
+          removes rights that cannot be excluded under applicable law.
+        </p>
+        <h2>Changes and contact</h2>
+        <p>
+          We may update these terms and will notify users of material changes
+          through the service or by email. These terms are governed by Texas
+          law, with disputes resolved in the courts of Galveston County, Texas,
+          subject to applicable mandatory law. Contact{" "}
+          <a href="mailto:brian@autolocal.ai">brian@autolocal.ai</a> with
+          questions.
+        </p>
+      </main>
+      <MarketingFooter />
     </div>
   );
 }

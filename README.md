@@ -1,36 +1,24 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AutoLocal
 
-## Getting Started
+Websites, business information, and inquiry management for local business owners.
 
-First, run the development server:
+The app uses Next.js 16, React 19, TypeScript, and Node.js 24 LTS. Supabase owns authentication/private data; Stripe, Resend, Google, and Vercel are optional runtime integrations. Missing credentials disable the relevant actions without preventing a build.
 
-```bash
+## Local development
+
+```sh
+npm ci
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Copy `.env.example` to an untracked local environment file only when connecting an approved development environment. Side effects are disabled by default. The public template gallery and demonstration workspace work without provider accounts.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Verification
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```sh
+npm run lint
+npm test
+npm run build
+```
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Tests use local fixtures and mocks, not live accounts. See [launch preparation and provider gates](docs/LAUNCH-READINESS.md) before configuring workers, billing, publishing, email, Google editing, or domain purchases. The CI workflow verifies code and does not deploy.

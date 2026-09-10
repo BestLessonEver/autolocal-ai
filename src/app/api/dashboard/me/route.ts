@@ -1,42 +1,29 @@
-import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { NextResponse } from 'next/server'
-
-export async function GET() {
-  const supabase = createServerSupabaseClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-  if (authError || !user?.email) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  // Look up their site by email
-  const { data: site, error } = await supabase
-    .from('website_previews')
-    .select('*')
-    .eq('email', user.email)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .single()
-
-  if (error || !site) {
-    return NextResponse.json({ error: 'No website found for this email' }, { status: 404 })
-  }
-
-  // Get change request stats
-  const now = new Date()
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
-  const { count: changesThisMonth } = await supabase
-    .from('change_requests')
-    .select('*', { count: 'exact', head: true })
-    .eq('preview_id', site.id)
-    .gte('created_at', monthStart)
-
+import {appOrigin} from '@/lib/integration-config'
+import {ownerSetupHealth,type ProviderHealthRow} from '@/lib/owner-setup-health'
+import {requireOwnerSite,selectorFromRequest,apiErrorResponse,ApiError} from '@/lib/owner-access'
+export async function GET(request:Request) {
+  try {
+  const {site,db,user}=await requireOwnerSite(selectorFromRequest(request))
+  const monthStart=new Date();monthStart.setUTCDate(1);monthStart.setUTCHours(0,0,0,0)
+  const {count:changesThisMonth,error}=await db.from('change_requests').select('id',{count:'exact',head:true}).eq('preview_id',site.id).gte('created_at',monthStart.toISOString())
+  if(error) throw new ApiError(503,'Your dashboard is temporarily unavailable.')
+  const connections=await db.from('google_connections').select('provider,status,resource_name,last_synced_at,error_code').eq('site_id',site.id).eq('owner_id',user.id)
+  const setupHealth=ownerSetupHealth(site,connections.error?null:connections.data as ProviderHealthRow[])
   const plan = site.plan || 'starter'
   const unlimited = plan === 'living'
   const used = changesThisMonth || 0
   const freeRemaining = unlimited ? Infinity : Math.max(0, 2 - used)
 
-  return NextResponse.json({
+  return Response.json({
+    id: site.id,
+    subscription_status: site.subscription_status || null,
+    has_billing: !!site.stripe_customer_id,
+    service_areas: site.service_areas || [],
+    business_facts: site.business_facts || {},
+    faq: site.faq || [],
+    contact_name: site.contact_name || null,
+    show_address: site.show_address !== false,
+    setup_health: setupHealth,
     business_name: site.business_name,
     slug: site.slug,
     tagline: site.tagline,
@@ -53,8 +40,8 @@ export async function GET() {
     hero_image_url: site.hero_image_url,
     services: site.services || [],
     hours: site.hours,
-    preview_url: `https://autolocal.ai/preview/${site.slug}`,
-    website_url: site.website_current || `https://autolocal.ai/preview/${site.slug}`,
+    preview_url: `${appOrigin()}/preview/${site.slug}`,
+    website_url: site.deployment_verified_at ? site.website_current : null,
     website_current: site.website_current || null,
     view_count: site.view_count || 0,
     created_at: site.created_at,
@@ -75,4 +62,5 @@ export async function GET() {
     hero_crop: site.hero_crop ?? 50,
     site_mode: site.site_mode || 'business',
   })
+  } catch(error) { return apiErrorResponse(error) }
 }

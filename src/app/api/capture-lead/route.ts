@@ -1,79 +1,17 @@
-import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-import { internalAuthHeader } from '@/lib/internal-auth'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
-
-export async function POST(req: Request) {
+import {enforcePublicBudget} from '@/lib/public-rate-limit'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { cleanText, validEmail } from '@/lib/lead-intake'
+import { apiErrorResponse, ApiError } from '@/lib/owner-access'
+export async function POST(request: Request) {
   try {
-    const { email, name, phone, businessName, city, source } = await req.json()
-
-    if (!email) {
-      return NextResponse.json({ error: 'Email required' }, { status: 400 })
-    }
-
-    // Store lead in outbound_emails as a tracking record
-    // Use template_used to track funnel stage, approach for source
-    const { error } = await supabase.from('outbound_emails').upsert({
-      to_email: email.toLowerCase().trim(),
-      from_email: 'brian@autolocal.ai',
-      subject: `Lead: ${businessName || 'Unknown'} (${name || 'no name'})`,
-      template_used: source || 'landing_page',
-      approach: JSON.stringify({
-        name: name || null,
-        phone: phone || null,
-        businessName: businessName || null,
-        city: city || null,
-        capturedAt: new Date().toISOString(),
-      }),
-      status: 'lead',
-    }, {
-      onConflict: 'to_email',
-      ignoreDuplicates: true,
+    const body=await request.json()
+    const name=cleanText(body.name,150),email=cleanText(body.email,254).toLowerCase(),message=cleanText(body.message,3000)
+    if (!name || !validEmail(email) || !message || body.consent!==true || body.website) throw new ApiError(400,'Enter your name, email and message, and allow us to respond.')
+    const limited=await enforcePublicBudget(request,'contact');if(limited)return limited
+    const {error}=await createAdminClient().from('contact_inquiries').insert({
+      name,email,message,business_name:cleanText(body.businessName,200),source:cleanText(body.source,100)||'contact',consent:true,marketing_opt_in:body.marketingOptIn===true,
     })
-
-    if (error) {
-      // If upsert fails due to no unique constraint, just insert
-      await supabase.from('outbound_emails').insert({
-        to_email: email.toLowerCase().trim(),
-        from_email: 'brian@autolocal.ai',
-        subject: `Lead: ${businessName || 'Unknown'} (${name || 'no name'})`,
-        template_used: source || 'landing_page',
-        approach: JSON.stringify({
-          name: name || null,
-          phone: phone || null,
-          businessName: businessName || null,
-          city: city || null,
-          capturedAt: new Date().toISOString(),
-        }),
-        status: 'lead',
-      })
-    }
-
-    // Enqueue drip campaign (non-blocking)
-    const dripStage = source === 'selected_google_business' ? 'previewed' : 'searched'
-    fetch('https://autolocal.ai/api/drip/enqueue', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': internalAuthHeader(),
-      },
-      body: JSON.stringify({
-        email: email.toLowerCase().trim(),
-        stage: dripStage,
-        slug: businessName ? businessName.toLowerCase().replace(/[^a-z0-9]+/g, '-') : null,
-        businessName,
-        contactName: name,
-      }),
-    }).catch(err => console.error('Capture-lead fire-and-forget failed:', err))
-
-    return NextResponse.json({ captured: true })
-  } catch (err) {
-    console.error('Lead capture error:', err)
-    // Never block the user flow — return success even on error
-    return NextResponse.json({ captured: false })
-  }
+    if (error) throw new ApiError(503,'Your message could not be saved. Please try again.')
+    return Response.json({success:true,captured:true})
+  } catch(error) {return apiErrorResponse(error)}
 }

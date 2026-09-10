@@ -1,173 +1,65 @@
-/**
- * Vercel Domains Registrar API client
- * Replaces Namecheap — simpler, one vendor, auto-DNS + SSL
- */
+import { requireCapability } from '@/lib/integration-config'
+import { JobError } from '@/lib/integration-jobs'
+import { attachDomain, vercelJson, vercelRequest } from '@/lib/providers/vercel'
 
-const VERCEL_TOKEN = process.env.VERCEL_TOKEN!
-const VERCEL_TEAM_ID = process.env.VERCEL_TEAM_ID || ''
-const BASE = 'https://api.vercel.com/v1/registrar'
-
-function teamParam(): string {
-  return VERCEL_TEAM_ID ? `?teamId=${VERCEL_TEAM_ID}` : ''
+const PRICES: Record<string, { register: number; renew: number }> = {
+  com: { register: 17.99, renew: 17.99 }, net: { register: 18.99, renew: 18.99 },
+  org: { register: 17.99, renew: 17.99 }, co: { register: 34.99, renew: 34.99 },
+  us: { register: 12.99, renew: 12.99 }, biz: { register: 29.99, renew: 29.99 },
 }
-
-function headers() {
-  return {
-    Authorization: `Bearer ${VERCEL_TOKEN}`,
-    'Content-Type': 'application/json',
-  }
+export const SUPPORTED_TLDS = Object.keys(PRICES)
+export function normalizeHostname(input: unknown): string | null {
+  if (typeof input !== 'string') return null
+  const hostname = input.trim().toLowerCase()
+  if (hostname.length > 253 || !/^[a-z0-9.-]+\.[a-z]{2,63}$/.test(hostname) || hostname.endsWith('.local') || hostname.endsWith('.internal')) return null
+  if (hostname.split('.').some(label => !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(label))) return null
+  return hostname
 }
-
-// Our retail markup over Vercel wholesale
-const MARKUP: Record<string, { register: number; renew: number }> = {
-  com:  { register: 17.99, renew: 17.99 },
-  net:  { register: 18.99, renew: 18.99 },
-  org:  { register: 14.99, renew: 17.99 },
-  co:   { register: 24.99, renew: 34.99 },
-  us:   { register: 12.99, renew: 12.99 },
-  biz:  { register: 24.99, renew: 29.99 },
+export function normalizeDomain(input: unknown): string | null {
+  if (typeof input !== 'string') return null
+  const value = input.trim().toLowerCase()
+  const [name, tld, extra] = value.split('.')
+  if (extra || !name || !SUPPORTED_TLDS.includes(tld) || name.length > 63 || !/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(name)) return null
+  return value
 }
-
 export interface DomainAvailability {
-  domain: string
-  available: boolean
-  purchasePrice: number | null
-  renewalPrice: number | null
-  retailPrice: number | null    // what we charge
-  retailRenew: number | null    // what we charge on renewal
+  domain: string; available: boolean; purchasePrice: number | null; renewalPrice: number | null;
+  retailPrice: number | null; retailRenew: number | null
 }
-
-/**
- * Check availability + pricing for multiple domains in one call
- */
 export async function checkAvailability(domains: string[]): Promise<DomainAvailability[]> {
-  // 1. Bulk availability check
-  const availRes = await fetch(`${BASE}/domains/availability${teamParam()}`, {
-    method: 'POST',
-    headers: headers(),
-    body: JSON.stringify({ domains }),
-  })
-
-  if (!availRes.ok) {
-    const err = await availRes.text()
-    throw new Error(`Vercel availability check failed: ${err}`)
-  }
-
-  const { results } = await availRes.json() as {
-    results: { domain: string; available: boolean }[]
-  }
-
-  // 2. Get pricing for available domains (parallel)
-  const enriched = await Promise.all(
-    results.map(async (r) => {
-      if (!r.available) {
-        return {
-          domain: r.domain,
-          available: false,
-          purchasePrice: null,
-          renewalPrice: null,
-          retailPrice: null,
-          retailRenew: null,
-        }
-      }
-
-      try {
-        const priceRes = await fetch(
-          `${BASE}/domains/${r.domain}/price${teamParam()}`,
-          { headers: headers() }
-        )
-
-        if (priceRes.ok) {
-          const price = await priceRes.json() as {
-            purchasePrice: number | null
-            renewalPrice: number | null
-          }
-
-          const tld = r.domain.split('.').pop() || ''
-          const markup = MARKUP[tld]
-
-          return {
-            domain: r.domain,
-            available: true,
-            purchasePrice: price.purchasePrice,
-            renewalPrice: price.renewalPrice,
-            retailPrice: markup?.register ?? (price.purchasePrice ? Math.ceil(price.purchasePrice * 1.5 * 100) / 100 : null),
-            retailRenew: markup?.renew ?? (price.renewalPrice ? Math.ceil(price.renewalPrice * 1.5 * 100) / 100 : null),
-          }
-        }
-      } catch { /* fall through */ }
-
-      // Pricing failed — use markup table only
-      const tld = r.domain.split('.').pop() || ''
-      const markup = MARKUP[tld]
-      return {
-        domain: r.domain,
-        available: true,
-        purchasePrice: null,
-        renewalPrice: null,
-        retailPrice: markup?.register ?? 17.99,
-        retailRenew: markup?.renew ?? 17.99,
-      }
-    })
-  )
-
-  return enriched
+  if (!domains.length || domains.length > 6 || domains.some(domain => !normalizeDomain(domain))) throw new Error('Invalid domain search')
+  const { results } = await vercelJson<{ results: { domain: string; available: boolean }[] }>('/v1/registrar/domains/availability', { method: 'POST', body: JSON.stringify({ domains }) })
+  if (!Array.isArray(results)) throw new Error('Invalid domain availability response')
+  return Promise.all(domains.map(async domain => {
+    const available = results.find(row => row.domain === domain)?.available === true
+    if (!available) return { domain, available: false, purchasePrice: null, renewalPrice: null, retailPrice: null, retailRenew: null }
+    const raw = await vercelJson<{ purchasePrice: number | string; renewalPrice: number | string }>(`/v1/registrar/domains/${encodeURIComponent(domain)}/price?years=1`)
+    const price = { purchasePrice: parseProviderPrice(raw.purchasePrice), renewalPrice: parseProviderPrice(raw.renewalPrice) }
+    if (!Number.isFinite(price.purchasePrice) || price.purchasePrice <= 0 || !Number.isFinite(price.renewalPrice) || price.renewalPrice <= 0) throw new Error('Domain pricing is temporarily unavailable')
+    // No placeholder prices and no below-cost purchases for premium domains.
+    const minimum = PRICES[domain.split('.').pop()!]
+    return { domain, available, ...price, retailPrice: Math.max(minimum.register, Math.ceil(price.purchasePrice * 1.25 * 100) / 100), retailRenew: Math.max(minimum.renew, Math.ceil(price.renewalPrice * 1.25 * 100) / 100) }
+  }))
 }
-
-/**
- * Register a domain via Vercel
- * Domain is instantly available on Vercel — no DNS setup needed
- */
-export async function registerDomain(
-  domain: string,
-  expectedPrice: number,
-  contactInfo: {
-    firstName: string
-    lastName: string
-    email: string
-    phone: string
-    address1: string
-    city: string
-    state: string
-    zip: string
-    country: string
-    companyName?: string
+export type Registrant = { firstName: string; lastName: string; email: string; phone: string; address1: string; city: string; state: string; zip: string; country: string; companyName?: string }
+export function parseProviderPrice(value: unknown): number {
+  if (typeof value === 'number') return value
+  return typeof value === 'string' && /^\d+(?:\.\d+)?$/.test(value) ? Number(value) : NaN
+}
+export async function registerDomain(domain: string, expectedPrice: number, contactInfo: Registrant): Promise<{ success: true; orderId: string }> {
+  requireCapability('domainPurchases')
+  if (!normalizeDomain(domain) || !Number.isFinite(expectedPrice) || expectedPrice <= 0) throw new JobError('Invalid domain order', false)
+  if (!/^\+[1-9]\d{7,14}$/.test(contactInfo.phone) || !/^[A-Z]{2}$/.test(contactInfo.country)) throw new JobError('Domain contact requires an international phone number and two-letter country code.', false)
+  let response: Response
+  try {
+    response = await vercelRequest(`/v1/registrar/domains/${encodeURIComponent(domain)}/buy`, { method: 'POST', body: JSON.stringify({ autoRenew: false, years: 1, expectedPrice, contactInformation: contactInfo }) })
+  } catch {
+    // A timeout can occur after a registrar accepted payment. Never repeat it automatically.
+    throw new JobError('Domain purchase outcome is unknown. Review the provider order before retrying.', false, true)
   }
-): Promise<{ success: boolean; orderId?: string; error?: string }> {
-  const res = await fetch(`${BASE}/domains/${domain}/buy${teamParam()}`, {
-    method: 'POST',
-    headers: headers(),
-    body: JSON.stringify({
-      autoRenew: true,
-      years: 1,
-      expectedPrice,
-      contactInformation: contactInfo,
-    }),
-  })
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ message: 'Unknown error' }))
-    return { success: false, error: err.message || `Registration failed (${res.status})` }
-  }
-
-  const data = await res.json()
+  if (!response.ok) throw new JobError(`Domain purchase needs review (provider HTTP ${response.status}).`, false, true)
+  const data = await response.json().catch(() => null)
+  if (!data?.orderId) throw new JobError('Domain purchase confirmation is missing. Review the provider order.', false, true)
   return { success: true, orderId: data.orderId }
 }
-
-/**
- * Add domain to a Vercel project (connects DNS)
- */
-export async function addDomainToProject(domain: string, projectId: string): Promise<boolean> {
-  const res = await fetch(
-    `https://api.vercel.com/v10/projects/${projectId}/domains${teamParam()}`,
-    {
-      method: 'POST',
-      headers: headers(),
-      body: JSON.stringify({ name: domain }),
-    }
-  )
-
-  return res.ok
-}
-
-export const SUPPORTED_TLDS = Object.keys(MARKUP)
+export async function addDomainToProject(domain: string, projectId: string): Promise<boolean> { await attachDomain(domain, projectId); return true }

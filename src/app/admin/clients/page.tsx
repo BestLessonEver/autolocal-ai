@@ -1,7 +1,9 @@
 /* eslint-disable @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any */
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 
 interface Client {
   id: string
@@ -51,12 +53,13 @@ const STATUS_COLORS: Record<string, string> = {
 
 const PACKAGE_LABELS: Record<string, string> = {
   starter: 'Free Website',
-  living: '$49/mo Living',
-  social_revive: '$499/mo Social',
-  growth: '$1,499/mo Growth',
+  living: 'Legacy Living',
+  social_revive: 'Legacy Social',
+  growth: 'Legacy Growth',
 }
 
 export default function AdminClientsPage() {
+  const router = useRouter()
   const [clients, setClients] = useState<Client[]>([])
   const [previews, setPreviews] = useState<Preview[]>([])
   const [loading, setLoading] = useState(true)
@@ -66,6 +69,22 @@ export default function AdminClientsPage() {
   const [expandedEmail, setExpandedEmail] = useState<string | null>(null)
   const [editingEmail, setEditingEmail] = useState<string | null>(null)
   const [editEmailValue, setEditEmailValue] = useState('')
+
+  const loadData = useCallback(async () => {
+    try {
+      const [clientsRes, previewsRes] = await Promise.all([
+        fetch('/api/admin/clients'), fetch('/api/admin/previews'),
+      ])
+      if (clientsRes.status === 401 || previewsRes.status === 401) {
+        router.push('/login?next=%2Fadmin%2Fclients')
+        return
+      }
+      if (clientsRes.ok) setClients(await clientsRes.json())
+      if (previewsRes.ok) setPreviews(await previewsRes.json())
+    } catch {
+      alert('Could not load administration data. Please try again.')
+    } finally { setLoading(false) }
+  }, [router])
 
   async function updateEmail(id: string) {
     const res = await fetch('/api/admin/previews', {
@@ -95,45 +114,8 @@ export default function AdminClientsPage() {
     }
   }
 
-  useEffect(() => {
-    loadData()
-  }, [])
+  useEffect(() => { const timer = setTimeout(() => void loadData(), 0); return () => clearTimeout(timer) }, [loadData])
 
-  async function loadData() {
-    setLoading(true)
-    try {
-      // Try cookie-based auth first (middleware already verified admin email)
-      const [clientsRes, previewsRes] = await Promise.all([
-        fetch('/api/admin/clients'),
-        fetch('/api/admin/previews'),
-      ])
-      if (clientsRes.status === 401 || previewsRes.status === 401) {
-        // Fallback: prompt for API key
-        const adminKey = sessionStorage.getItem('adminKey') || prompt('Admin API Key:')
-        if (!adminKey) { setLoading(false); return }
-        sessionStorage.setItem('adminKey', adminKey)
-        const headers = { 'x-admin-key': adminKey }
-        const [cr, pr] = await Promise.all([
-          fetch('/api/admin/clients', { headers }),
-          fetch('/api/admin/previews', { headers }),
-        ])
-        if (cr.status === 401 || pr.status === 401) {
-          sessionStorage.removeItem('adminKey')
-          alert('Invalid admin key')
-          setLoading(false)
-          return
-        }
-        if (cr.ok) setClients(await cr.json())
-        if (pr.ok) setPreviews(await pr.json())
-      } else {
-        if (clientsRes.ok) setClients(await clientsRes.json())
-        if (previewsRes.ok) setPreviews(await previewsRes.json())
-      }
-    } catch (e) {
-      console.error('Failed to load data:', e)
-    }
-    setLoading(false)
-  }
 
   const filteredPreviews = previews.filter(p =>
     p.business_name.toLowerCase().includes(search.toLowerCase()) ||
@@ -143,7 +125,7 @@ export default function AdminClientsPage() {
 
   const filteredClients = clients.filter(c =>
     c.business_name.toLowerCase().includes(search.toLowerCase()) ||
-    c.owner_name || c.business_name.toLowerCase().includes(search.toLowerCase()) ||
+    (c.owner_name || '').toLowerCase().includes(search.toLowerCase()) ||
     c.email.toLowerCase().includes(search.toLowerCase())
   )
 
@@ -153,10 +135,10 @@ export default function AdminClientsPage() {
       <header className="border-b border-white/10 px-6 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <a href="/" className="text-xl font-black">
+            <Link href="/" className="text-xl font-black">
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">AutoLocal</span>
               <span className="text-gray-500">.ai</span>
-            </a>
+            </Link>
             <span className="text-gray-600 text-sm">/ Admin</span>
           </div>
           <div className="flex items-center gap-4">

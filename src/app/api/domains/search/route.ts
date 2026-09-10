@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { checkAvailability, SUPPORTED_TLDS } from '@/lib/vercel-domains'
+import { providerErrorResponse } from '@/lib/integration-config'
 
 export async function POST(req: Request) {
   try {
@@ -49,7 +50,6 @@ export async function POST(req: Request) {
       })),
     })
   } catch (err) {
-    console.error('Domain search error:', err)
-    return NextResponse.json({ error: 'Domain search failed' }, { status: 500 })
+    return providerErrorResponse(err)
   }
 }

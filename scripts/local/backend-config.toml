@@ -1,0 +1,61 @@
+# Supabase CLI 2.117.0. Copy only to .runtime/backend/supabase/config.toml.
+# This local configuration does not reference a hosted project or SMTP provider.
+project_id = "autolocal-local"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 17
+
+[db.seed]
+enabled = false
+
+[realtime]
+enabled = false
+
+[studio]
+enabled = false
+
+[local_smtp]
+enabled = true
+port = 54324
+
+[storage]
+enabled = true
+file_size_limit = "5MiB"
+
+[storage.s3_protocol]
+enabled = false
+
+[storage.vector]
+enabled = false
+
+[auth]
+enabled = true
+site_url = "http://127.0.0.1:3102"
+additional_redirect_urls = ["http://127.0.0.1:3102/**"]
+enable_signup = true
+enable_anonymous_sign_ins = false
+minimum_password_length = 8
+
+[auth.email]
+enable_signup = true
+enable_confirmations = true
+double_confirm_changes = true
+max_frequency = "1s"
+
+[auth.rate_limit]
+email_sent = 100
+
+[edge_runtime]
+enabled = false
+
+[analytics]
+enabled = false

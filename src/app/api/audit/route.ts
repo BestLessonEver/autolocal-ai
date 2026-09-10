@@ -1,74 +1,19 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { runAudit } from '@/lib/audit-engine'
-import { type Prospect } from '@/lib/prospect-finder'
-
-export async function POST(req: NextRequest) {
+import {internalRequestError} from '@/lib/internal-request'
+import {createAdminClient} from '@/lib/supabase/admin'
+import {apiErrorResponse,ApiError} from '@/lib/owner-access'
+import {cleanText} from '@/lib/lead-intake'
+import {safeUrl} from '@/lib/site-content'
+export async function POST(request:Request) {
+  const denied=internalRequestError(request);if(denied)return denied
   try {
-    const body = await req.json()
-    const { businessName, website, city, state, category } = body
-
-    if (!businessName || !city || !state) {
-      return NextResponse.json(
-        { error: 'businessName, city, and state are required' },
-        { status: 400 }
-      )
-    }
-
-    // Build a prospect from the request
-    const prospect: Prospect = {
-      id: crypto.randomUUID(),
-      businessName,
-      category: category || 'general',
-      address: `${city}, ${state}`,
-      city,
-      state,
-      website: website || undefined,
-    }
-
-    // Run the audit
-    const audit = await runAudit(prospect)
-    const auditId = crypto.randomUUID()
-    audit.id = auditId
-
-    // Store in Supabase if available
-    if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      try {
-        const { createClient } = await import('@supabase/supabase-js')
-        const supabase = createClient(
-          process.env.NEXT_PUBLIC_SUPABASE_URL,
-          process.env.SUPABASE_SERVICE_ROLE_KEY
-        )
-
-        await supabase.from('audits').insert({
-          id: auditId,
-          business_name: businessName,
-          city,
-          state,
-          category: category || 'general',
-          website_url: website || null,
-          google_place_id: prospect.placeId || null,
-          overall_score: audit.overallScore,
-          data: audit,
-        })
-      } catch (err) {
-        console.error('Failed to store audit in Supabase:', err)
-        // Continue — audit still works without storage
-      }
-    }
-
-    const reportUrl = `/audit/${auditId}`
-
-    return NextResponse.json({
-      success: true,
-      auditId,
-      reportUrl,
-      audit,
-    })
-  } catch (err) {
-    console.error('Audit API error:', err)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
-  }
+    const body=await request.json(),businessName=cleanText(body.businessName,200),city=cleanText(body.city,100),state=cleanText(body.state,100)
+    if(!businessName||!city||!state)throw new ApiError(400,'Business name, city and state are required.')
+    const website=safeUrl(body.website),category=cleanText(body.category,100)||'general'
+    const {runAudit}=await import('@/lib/audit-engine')
+    const audit=await runAudit({id:crypto.randomUUID(),businessName,category,address:[city,state].join(', '),city,state,website:website||undefined})
+    const auditId=crypto.randomUUID();audit.id=auditId
+    const {error}=await createAdminClient().from('audits').insert({id:auditId,business_name:businessName,city,state,category,website_url:website,overall_score:audit.overallScore,data:audit})
+    if(error)throw new ApiError(503,'The audit could not be saved. Please try again.')
+    return Response.json({success:true,auditId,reportUrl:'/audit/'+auditId,audit,requiresReview:true})
+  }catch(error){return apiErrorResponse(error)}
 }

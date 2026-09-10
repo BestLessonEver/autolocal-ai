@@ -1,30 +1,11 @@
-import { createClient } from '@supabase/supabase-js'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
-
-/**
- * Check if an email address has unsubscribed.
- * Call this before sending any outbound email.
- */
-export async function isUnsubscribed(email: string): Promise<boolean> {
-  const { data } = await supabase
-    .from('outbound_emails')
-    .select('id')
-    .eq('to_email', email.trim().toLowerCase())
-    .eq('status', 'unsubscribed')
-    .limit(1)
-
-  return (data?.length ?? 0) > 0
+import {createAdminClient} from '@/lib/supabase/admin'
+import {appOrigin} from '@/lib/integration-config'
+export async function isUnsubscribed(email:string):Promise<boolean> {
+  const db=createAdminClient()
+  const {data,error}=await db.from('unsubscribes').select('id').ilike('email',email.trim().toLowerCase().replace(/[\\%_]/g,'\\$&')).limit(1)
+  if(error)throw new Error('Unable to verify marketing consent; sending is blocked.')
+  return !!data?.length
 }
-
-/**
- * Get the unsubscribe URL for a given email.
- * Include this in every outbound email footer.
- */
-export function getUnsubscribeUrl(email: string): string {
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://autolocal.ai'
-  return `${baseUrl}/api/unsubscribe?email=${encodeURIComponent(email)}`
+export function getUnsubscribeUrl(email:string):string {
+  return appOrigin()+'/api/unsubscribe?email='+encodeURIComponent(email)
 }
