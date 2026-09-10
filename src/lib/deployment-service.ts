@@ -3,7 +3,7 @@ import { load } from 'cheerio'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { appOrigin, requireCapability, requireEnv } from '@/lib/integration-config'
 import { enqueueIntegrationJob, JobError, type IntegrationJob } from '@/lib/integration-jobs'
-import { attachDomain, deploymentState, vercelJson, vercelRequest, type Deployment } from '@/lib/providers/vercel'
+import { attachDomain, deploymentState, promoteDeployment, vercelJson, type Deployment } from '@/lib/providers/vercel'
 import { normalizeDomain, normalizeHostname, registerDomain, type Registrant } from '@/lib/vercel-domains'
 import { generateStaticSiteFiles } from '@/lib/static-templates'
 import { publicSiteData } from '@/components/templates/public-site-data'
@@ -124,8 +124,7 @@ export async function runDeployment(db: SupabaseClient, job: IntegrationJob) {
   if (current.data.requested_deployment_job_id !== job.id) return { skipped: 'A newer publishing request superseded this job' }
   if ((!suspended && !['active', 'pending_cancel'].includes(current.data.hosting_status)) || (suspended && current.data.hosting_status !== 'cancelled')) return { skipped: 'Hosting status changed' }
   if (!job.result?.promoted) {
-    const promotion = await vercelRequest(`/v10/projects/${encodeURIComponent(projectId)}/promote/${encodeURIComponent(deploymentId)}`, { method: 'POST' })
-    if (![200, 201, 202].includes(promotion.status)) throw new JobError(`Hosting promotion returned HTTP ${promotion.status}`)
+    await promoteDeployment(projectId, deploymentId)
     await saveJobResult(db, job, { ...job.result, promoted: true })
   }
   await attachDomain(domain, projectId)
