@@ -29,13 +29,37 @@ export interface PreviewData {
   cta_url: string | null
   template: string
   discord_webhook_url?: string | null
+  hosting_status?: string
+  deploy_status?: string
+  custom_domain?: string | null
+  domain_status?: string | null
+  service_areas?: string[]
+  faq?: { question: string; answer: string }[]
+  reviews_verified?: boolean
+  demo?: boolean
+  image_caption?: string | null
+  show_address?: boolean
 }
 
 export interface TemplateProps {
   data: PreviewData
 }
 
-export type TemplateName = 'bold' | 'elegant' | 'professional' | 'clutch' | 'artika' | 'bde'
+export type TemplateName = 'summit' | 'atelier' | 'ledger' | 'bold' | 'elegant' | 'professional' | 'clutch' | 'artika' | 'bde'
+
+export type ProfessionalTemplateName = 'summit' | 'atelier' | 'ledger'
+
+export const PROFESSIONAL_TEMPLATES = [
+  { id: 'summit', name: 'Summit', audience: 'Home & local services', description: 'Confident type, architectural lines, and a clear path to an inquiry.' },
+  { id: 'atelier', name: 'Atelier', audience: 'Personal services & studios', description: 'Warm editorial layouts, expressive photography, and room to breathe.' },
+  { id: 'ledger', name: 'Ledger', audience: 'Experts & professional services', description: 'Refined typography and a considered layout that puts your expertise first.' },
+] as const
+
+export function categoryToProfessionalTemplate(category: string): ProfessionalTemplateName {
+  if (/salon|spa|beauty|hair|wellness|fitness|yoga|studio|restaurant|cafe/i.test(category)) return 'atelier'
+  if (/contractor|plumb|hvac|electric|roof|clean|landscap|repair|home|auto|mechanic/i.test(category)) return 'summit'
+  return 'ledger'
+}
 
 /** Get the correct CTA button text based on URL type */
 export function getCtaButtonText(data: PreviewData): string {
@@ -47,15 +71,5 @@ export function getCtaButtonText(data: PreviewData): string {
 
 /** Map legacy category names to template names */
 export function categoryToTemplate(category: string): TemplateName {
-  switch (category) {
-    case 'salon':
-      return 'artika'
-    case 'dental':
-    case 'contractor':
-      return 'clutch'
-    case 'fitness':
-      return 'bde'
-    default:
-      return 'bde'
-  }
+  return categoryToProfessionalTemplate(category)
 }

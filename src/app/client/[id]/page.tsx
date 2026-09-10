@@ -1,5 +1,3 @@
-import { redirect } from 'next/navigation'
+import { permanentRedirect } from 'next/navigation'
 
-export default function ClientPage() {
-  redirect('/')
-}
+export default function LegacyPage() { permanentRedirect('/dashboard') }

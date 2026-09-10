@@ -1,56 +1,9 @@
-// audit_requests table
-// id uuid primary key default gen_random_uuid()
-// business_name text not null
-// website text
-// city text not null
-// state text not null
-// email text not null
-// status text default 'pending' (pending, processing, sent)
-// created_at timestamp default now()
-
-import { NextResponse } from 'next/server'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
-
-export async function POST(request: Request) {
+import {requireOwnerSite,selectorFromRequest,apiErrorResponse,ApiError} from '@/lib/owner-access'
+export async function POST(request:Request) {
   try {
-    const body = await request.json()
-    const { businessName, website, city, state, email } = body
-
-    // Validate required fields
-    if (!businessName || !city || !state || !email) {
-      return NextResponse.json(
-        { success: false, message: 'Missing required fields: businessName, city, state, email' },
-        { status: 400 }
-      )
-    }
-
-    const supabase = createServerSupabaseClient()
-
-    const { error } = await supabase.from('audit_requests').insert({
-      business_name: businessName,
-      website: website || null,
-      city,
-      state,
-      email,
-      status: 'pending',
-    })
-
-    if (error) {
-      console.error('Supabase insert error:', error)
-      return NextResponse.json(
-        { success: false, message: 'Failed to submit audit request' },
-        { status: 500 }
-      )
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: "We'll email your report within 24 hours",
-    })
-  } catch {
-    return NextResponse.json(
-      { success: false, message: 'Invalid request' },
-      { status: 400 }
-    )
-  }
+    const {site,db,user}=await requireOwnerSite(selectorFromRequest(request))
+    const {error}=await db.from('audit_requests').insert({business_name:site.business_name,website:site.website_current||null,city:site.city||'',state:site.state||'',email:user.email,status:'pending'})
+    if(error)throw new ApiError(503,'Your review request could not be saved.')
+    return Response.json({success:true,message:'Your business review request is saved for the team.'})
+  }catch(error){return apiErrorResponse(error)}
 }

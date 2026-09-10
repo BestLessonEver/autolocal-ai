@@ -6,7 +6,17 @@ const ADMIN_EMAILS = [
   'brian@autolocal.ai',
 ]
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
+  // An isolated, local-only gallery: no database, lead capture, or paid services.
+  if (process.env.NODE_ENV === 'development' && process.env.AUTOLOCAL_DESIGN_LAB_ONLY === '1') {
+    const path = request.nextUrl.pathname
+    if (path === '/design-lab' || path.startsWith('/_next/')) return NextResponse.next()
+    if (path.startsWith('/api/')) {
+      return NextResponse.json({ error: 'Services are disabled in the local design lab.' }, { status: 503 })
+    }
+    return NextResponse.redirect(new URL('/design-lab', request.url))
+  }
+  if (request.nextUrl.pathname.startsWith('/admin') && (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)) return NextResponse.redirect(new URL('/login', request.url))
   // Protect admin routes
   if (request.nextUrl.pathname.startsWith('/admin')) {
     let response = NextResponse.next({ request: { headers: request.headers } })

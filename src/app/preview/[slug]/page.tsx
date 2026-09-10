@@ -1,116 +1,45 @@
-/* eslint-disable @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any */
-import { createClient } from '@supabase/supabase-js'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { notFound } from 'next/navigation'
-import { type Metadata } from 'next'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { ApiError, requireOwnerSite } from '@/lib/owner-access'
+import { publicSiteData } from '@/components/templates/public-site-data'
+import { safeWebUrl } from '@/components/templates/professional-renderer'
+import type { Metadata } from 'next'
+import { redirect } from 'next/navigation'
 import PreviewWrapper from './PreviewWrapper'
 
-// Force dynamic rendering — previews are created on the fly
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
+type Props = { params: Promise<{ slug: string }> }
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+export const metadata: Metadata = { title: { absolute: 'Private website preview | AutoLocal' }, robots: { index: false, follow: false } }
 
-const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || 'brian@autolocal.ai').split(',').map(e => e.trim().toLowerCase())
-
-interface Props {
-  params: { slug: string }
+function verifiedPublicUrl(site: Record<string, unknown>) {
+  if (!['active', 'pending_cancel'].includes(String(site.hosting_status)) || site.deploy_status === 'suspended' || !site.deployment_verified_at) return ''
+  const url = safeWebUrl(site.website_current)
+  return url.startsWith('https://') ? url : ''
 }
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { data } = await supabase
-    .from('website_previews')
-    .select('business_name, tagline, description, hosting_status')
-    .eq('slug', params.slug)
-    .single()
-
-  if (!data) return { title: 'Preview Not Found' }
-
-  return {
-    title: `${data.business_name} | Website Preview`,
-    description: data.tagline || data.description || `Preview website for ${data.business_name}`,
-    robots: data.hosting_status === 'active' ? 'index, follow' : 'noindex, nofollow',
-  }
+async function publicSiteUrl(slug: string) {
+  const db = createAdminClient()
+  const { data, error } = await db.from('website_previews').select('website_current,hosting_status,deploy_status,deployment_verified_at').eq('slug', slug).in('hosting_status', ['active', 'pending_cancel']).not('deployment_verified_at', 'is', null).maybeSingle()
+  if (error) throw new ApiError(503, 'Website temporarily unavailable.')
+  return data ? verifiedPublicUrl(data) : ''
 }
 
-export default async function PreviewPage({ params, searchParams }: Props & { searchParams: { token?: string } }) {
-  const { data, error } = await supabase
-    .from('website_previews')
-    .select('*')
-    .eq('slug', params.slug)
-    .single()
-
-  if (!data || error) {
-    notFound()
+export default async function PreviewPage({ params }: Props) {
+  const { slug } = await params
+  let site: Record<string, unknown> | null = null
+  let liveUrl = ''
+  let unavailable = false
+  try {
+    const result = await requireOwnerSite({ slug })
+    site = result.site
+    liveUrl = verifiedPublicUrl(site!)
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 503) unavailable = true
+    try { liveUrl = await publicSiteUrl(slug) } catch { unavailable = true }
   }
-
-  // If hosting is active (deployed), the preview is public
-  if (data.hosting_status === 'active') {
-    void supabase.rpc('increment_preview_views', { preview_slug: params.slug })
-    const activeToken = data.id ? `${data.id.substring(0, 8)}-${params.slug}` : undefined
-    return <PreviewWrapper data={data} accessToken={activeToken} />
-  }
-
-  // For non-active sites, require authentication — owner, admin, or valid token
-  let authorized = false
-
-  // Check token access (from /my-site/[token] dashboard)
-  const token = searchParams?.token
-  if (token) {
-    const dashIdx = token.indexOf('-')
-    if (dashIdx >= 4) {
-      const idPrefix = token.substring(0, 8)
-      const tokenSlug = token.substring(9)
-      if (tokenSlug === params.slug && data.id?.startsWith(idPrefix)) {
-        authorized = true
-      }
-    }
-  }
-
-  // Check cookie auth
-  if (!authorized) {
-    try {
-      const authSupabase = createServerSupabaseClient()
-      const { data: { user } } = await authSupabase.auth.getUser()
-
-      if (user?.email) {
-        const userEmail = user.email.toLowerCase()
-        if (ADMIN_EMAILS.includes(userEmail)) {
-          authorized = true
-        } else if (data.email?.toLowerCase() === userEmail || data.contact_email?.toLowerCase() === userEmail) {
-          authorized = true
-        }
-      }
-    } catch {
-      // No valid session
-    }
-  }
-
-  if (!authorized) {
-    return (
-      <div className="min-h-screen bg-[#09090b] flex items-center justify-center px-4">
-        <div className="max-w-md text-center">
-          <span className="text-6xl block mb-6">🔒</span>
-          <h1 className="text-2xl font-black text-white mb-3">Private Preview</h1>
-          <p className="text-gray-400 mb-6">
-            This website preview is private. Please log in with the email associated with this business to view it.
-          </p>
-          <a
-            href={`/login?redirect=/preview/${params.slug}`}
-            className="inline-block px-8 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold hover:brightness-110 transition"
-          >
-            Log In to View →
-          </a>
-          <p className="text-gray-600 text-xs mt-8">Powered by AutoLocal.ai</p>
-        </div>
-      </div>
-    )
-  }
-
-  void supabase.rpc('increment_preview_views', { preview_slug: params.slug })
-  const previewAccessToken = (token as string) || (data.id ? `${data.id.substring(0, 8)}-${params.slug}` : undefined)
-  return <PreviewWrapper data={data} accessToken={previewAccessToken} />
+  // Saved business fields are drafts. Anonymous visitors only see the last verified publication.
+  if (!site && liveUrl) redirect(liveUrl)
+  if (!site) return <main style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: '#f7f5ef', color: '#16372f', padding: 24 }}><div style={{ maxWidth: 420, textAlign: 'center' }}><p style={{ letterSpacing: '.15em', fontSize: 12, marginBottom: 20 }}>AUTOLOCAL</p><h1 style={{ fontSize: 36, letterSpacing: '-.04em', lineHeight: 1.1 }}>{unavailable ? 'Temporarily unavailable' : 'Your preview is private.'}</h1><p style={{ lineHeight: 1.7, marginTop: 20 }}>{unavailable ? 'Please try again shortly. Your website details have not been changed.' : 'Sign in with the verified email for this business to view its website.'}</p><a style={{ display: 'inline-block', padding: '14px 22px', background: '#16372f', color: 'white', marginTop: 24 }} href={`/login?redirect=${encodeURIComponent(`/preview/${slug}`)}`}>Sign in to continue</a></div></main>
+  return <PreviewWrapper data={publicSiteData(site)} isOwner hasPublishedSite={!!liveUrl} />
 }

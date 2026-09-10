@@ -1,82 +1,24 @@
-import { Metadata } from 'next'
+import type { Metadata } from 'next'
 import Link from 'next/link'
 import MarketingNav from '@/components/MarketingNav'
 import MarketingFooter from '@/components/MarketingFooter'
+import styles from '@/components/marketing.module.css'
 
-export const metadata: Metadata = {
-  title: 'About — AutoLocal.ai',
-  description: "We're on a mission to bring enterprise-grade AI to local businesses. Learn about our story and team.",
-}
-
-const VALUES = [
-  { value: 'Done-For-You', desc: "We don't hand you software and wish you luck. We do the work." },
-  { value: 'Local-First', desc: 'Every strategy is tailored to your specific market and community.' },
-  { value: 'Results-Driven', desc: 'We measure success by your growth — more customers, more revenue, less stress.' },
-]
-
-const TEAM = [
-  { name: 'Coming Soon', role: 'Founder & CEO' },
-  { name: 'Coming Soon', role: 'Head of AI' },
-  { name: 'Coming Soon', role: 'Head of Marketing' },
-]
+export const metadata: Metadata = { title: 'About AutoLocal', description: 'A practical approach to a better website, accurate business information, and organized customer inquiries.', alternates: { canonical: '/about' } }
 
 export default function AboutPage() {
-  return (
-    <div className="min-h-screen bg-navy-950">
-      <MarketingNav />
-
-      <section className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/10 via-transparent to-purple-500/10" />
-        <div className="relative max-w-6xl mx-auto px-6 py-24 md:py-32">
-          <div className="max-w-3xl">
-            <h1 className="text-4xl md:text-5xl font-extrabold text-white mb-6">AI Shouldn&apos;t Be Just for Big Companies</h1>
-            <p className="text-lg text-slate-400 leading-relaxed">We started AutoLocal.ai because we saw local businesses drowning in marketing tasks while enterprise companies automated everything. That didn&apos;t seem fair.</p>
-          </div>
-        </div>
-      </section>
-
-      <section className="max-w-6xl mx-auto px-6 py-24">
-        <div className="grid md:grid-cols-2 gap-16 items-center">
-          <div>
-            <h2 className="text-3xl font-extrabold text-white mb-6">Our Mission</h2>
-            <p className="text-slate-400 leading-relaxed mb-4">Local businesses are the backbone of every community. The restaurant where you celebrate birthdays. The salon that knows your name. The contractor who shows up on time.</p>
-            <p className="text-slate-400 leading-relaxed mb-4">These businesses deserve the same powerful AI tools that Fortune 500 companies use — without the Fortune 500 budget or a dedicated IT team.</p>
-            <p className="text-slate-400 leading-relaxed">That&apos;s why we exist. We package enterprise-grade AI into done-for-you services that any local business can afford and benefit from. No technical knowledge required.</p>
-          </div>
-          <div className="space-y-6">
-            {VALUES.map(v => (
-              <div key={v.value} className="glass rounded-2xl p-6">
-                <h3 className="text-lg font-bold text-cyan-400 mb-2">{v.value}</h3>
-                <p className="text-sm text-slate-500">{v.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="border-y border-slate-800/50">
-        <div className="max-w-6xl mx-auto px-6 py-24 text-center">
-          <h2 className="text-3xl font-extrabold text-white mb-12">Our Team</h2>
-          <p className="text-slate-400 max-w-2xl mx-auto mb-12">We&apos;re a small team of AI engineers, marketers, and local business advocates. We&apos;ve built AI systems for companies of all sizes — and now we&apos;re focused entirely on helping local businesses thrive.</p>
-          <div className="grid md:grid-cols-3 gap-8">
-            {TEAM.map(t => (
-              <div key={t.role} className="glass rounded-2xl p-8">
-                <div className="w-20 h-20 bg-gradient-to-br from-cyan-400 to-indigo-500 rounded-full mx-auto mb-4" />
-                <h3 className="text-lg font-bold text-white">{t.name}</h3>
-                <p className="text-sm text-slate-500">{t.role}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="max-w-6xl mx-auto px-6 py-24 text-center">
-        <h2 className="text-3xl font-extrabold text-white mb-4">Ready to Join Us?</h2>
-        <p className="text-slate-400 max-w-lg mx-auto mb-8">Let&apos;s talk about how AI can transform your local business.</p>
-        <Link href="/contact" className="inline-block btn-gradient px-8 py-4 rounded-xl font-semibold text-white">Get in Touch</Link>
-      </section>
-
-      <MarketingFooter />
-    </div>
-  )
+  return <div className={styles.surface}><MarketingNav /><main className={styles.prose}>
+    <p className={styles.eyebrow}>Built for the business owner</p>
+    <h1>Good work deserves a clear introduction.</h1>
+    <p>Customers need to know what you do, where you work, and how to reach you. AutoLocal brings those basics together in a professional website and a workspace you can keep up with.</p>
+    <h2>Start with your real business</h2>
+    <p>Bring your services, contact details, photos, and the questions customers ask. Review a website preview before choosing a paid plan or approving a launch.</p>
+    <h2>Keep control of what customers see</h2>
+    <p>Your business facts come first. Review proposed changes, connect the Google accounts you choose, and see whether an update is saved, waiting to publish, or verified live.</p>
+    <h2>Give each inquiry a next step</h2>
+    <p>A contact form is the beginning of a conversation. Your workspace keeps submitted inquiries together so you can follow up and record the outcome.</p>
+    <h2>Measure what actually happened</h2>
+    <p>We distinguish website activity, search visibility, and customer inquiries. Search rankings and new business cannot be guaranteed. You should be able to see what is connected and what still needs attention.</p>
+    <p><Link href="/start">Create your free preview</Link> or <Link href="/contact">tell us about your project</Link>.</p>
+  </main><MarketingFooter /></div>
 }

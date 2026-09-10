@@ -1,40 +1,66 @@
-'use client'
-import Link from 'next/link'
-import Image from 'next/image'
-import { useState } from 'react'
-import { Menu, X } from 'lucide-react'
-
-export default function MarketingNav() {
-  const [open, setOpen] = useState(false)
-
+"use client";
+import Link from "next/link";
+import { Menu, X, ArrowUpRight, MapPin } from "lucide-react";
+import { useState } from "react";
+import styles from "./marketing.module.css";
+export function Brand({ small = false }: { small?: boolean }) {
   return (
-    <nav className="relative z-50 flex items-center justify-between px-6 py-5 max-w-7xl mx-auto">
-      <div className="flex items-center gap-8">
-        <Link href="/" className="flex items-center gap-2 text-2xl font-bold gradient-text">
-          <Image src="/logo.png" alt="AutoLocal.ai" width={36} height={36} className="rounded-lg" />
-          AutoLocal.ai
-        </Link>
-        <div className="hidden md:flex items-center gap-6">
-          <a href="/#how-it-works" className="text-slate-400 hover:text-white transition text-sm">How It Works</a>
-          <a href="/#services" className="text-slate-400 hover:text-white transition text-sm">Services</a>
-          <a href="/#pricing" className="text-slate-400 hover:text-white transition text-sm">Pricing</a>
+    <Link
+      href="/"
+      aria-label="AutoLocal home"
+      className={`${styles.brand} ${small ? styles.brandSmall : ""}`}
+    >
+      <MapPin aria-hidden="true" strokeWidth={2.6} />
+      <span>
+        autolocal<span className={styles.brandDot}>.</span>
+      </span>
+    </Link>
+  );
+}
+export default function MarketingNav() {
+  const [open, setOpen] = useState(false);
+  return (
+    <header className={styles.header}>
+      <div className={styles.nav}>
+        <Brand />
+        <nav className={styles.desktopLinks} aria-label="Main navigation">
+          <Link href="/#how-it-works">How it works</Link>
+          <Link href="/templates">Website designs</Link>
+          <Link href="/#services">What’s included</Link>
+        </nav>
+        <div className={styles.navActions}>
+          <Link href="/login" className={styles.login}>
+            Sign in
+          </Link>
+          <Link href="/start" className={styles.buttonSmall}>
+            Get started <ArrowUpRight size={16} aria-hidden="true" />
+          </Link>
+          <button
+            type="button"
+            className={styles.menuButton}
+            aria-expanded={open}
+            aria-controls="mobile-nav"
+            aria-label={open ? "Close navigation" : "Open navigation"}
+            onClick={() => setOpen(!open)}
+          >
+            {open ? <X /> : <Menu />}
+          </button>
         </div>
       </div>
-      <div className="hidden md:flex items-center gap-4">
-        <a href="/#audit-form" className="btn-gradient px-5 py-2.5 rounded-lg text-sm font-semibold text-white">Get Your Free Audit</a>
-      </div>
-      {/* Mobile */}
-      <button onClick={() => setOpen(!open)} className="md:hidden text-white">
-        {open ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-      </button>
       {open && (
-        <div className="absolute top-full left-0 right-0 glass p-6 md:hidden flex flex-col gap-4">
-          <a href="/#how-it-works" className="text-slate-300 text-sm" onClick={() => setOpen(false)}>How It Works</a>
-          <a href="/#services" className="text-slate-300 text-sm" onClick={() => setOpen(false)}>Services</a>
-          <a href="/#pricing" className="text-slate-300 text-sm" onClick={() => setOpen(false)}>Pricing</a>
-          <a href="/#audit-form" className="btn-gradient px-5 py-2.5 rounded-lg text-sm font-semibold text-white text-center" onClick={() => setOpen(false)}>Get Your Free Audit</a>
-        </div>
+        <nav
+          id="mobile-nav"
+          aria-label="Mobile navigation"
+          className={styles.mobileLinks}
+          onClick={() => setOpen(false)}
+        >
+          <Link href="/#how-it-works">How it works</Link>
+          <Link href="/templates">Website designs</Link>
+          <Link href="/#services">What’s included</Link>
+          <Link href="/contact">Talk to us</Link>
+          <Link href="/login">Sign in</Link>
+        </nav>
       )}
-    </nav>
-  )
+    </header>
+  );
 }

@@ -223,7 +223,7 @@ export default function ReceiptTemplate({ data }: TemplateProps) {
         {/* Barcode */}
         <div className="receipt-barcode">
           {Array.from({ length: 40 }).map((_, i) => (
-            <span key={i} style={{ width: Math.random() > 0.5 ? '2px' : '1px' }} />
+            <span key={i} style={{ width: (i * 7 + 3) % 5 > 2 ? '2px' : '1px' }} />
           ))}
         </div>
 

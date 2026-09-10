@@ -1,14 +1,14 @@
 #!/bin/bash
 # AutoLocal Nightly Optimization
-# Runs overnight to refresh Google data, optimize copy, and redeploy improved sites
+# Runs overnight to refresh Google data, refresh listing signals and queue reviewed publishing
 # Usage: bash scripts/nightly-optimize.sh [--dry-run]
 #
-# Requires ADMIN_API_KEY env var or reads from Railway
+# Requires explicit NEXT_PUBLIC_SITE_URL and INTERNAL_API_KEY configuration
 
 set -euo pipefail
 
-BASE_URL="https://autolocal-platform-v2-production.up.railway.app"
-API_KEY="${ADMIN_API_KEY:-autolocal-admin-f64ef3c27f3268dc17d22572}"
+BASE_URL="${NEXT_PUBLIC_SITE_URL:?Set NEXT_PUBLIC_SITE_URL for the intended environment}"
+API_KEY="${INTERNAL_API_KEY:?Set INTERNAL_API_KEY}"
 DRY_RUN=false
 
 if [[ "${1:-}" == "--dry-run" ]]; then
@@ -25,7 +25,7 @@ BODY="{\"dryRun\": $DRY_RUN}"
 response=$(curl -sS --max-time 120 \
   -X POST \
   -H "Content-Type: application/json" \
-  -H "x-api-key: $API_KEY" \
+  -H "Authorization: Bearer $API_KEY" \
   -d "$BODY" \
   "$BASE_URL/api/optimize" 2>&1)
 
@@ -39,7 +39,7 @@ response_state=$(echo "$response" | python3 -c "import sys,json; d=json.load(sys
 if [[ "$response_state" == "summary" ]]; then
   sites_changed=$(echo "$response" | python3 -c "import sys,json; print(json.load(sys.stdin)['summary']['sitesChanged'])")
   echo ""
-  echo "✅ Optimization complete — $sites_changed site(s) improved"
+  echo "✅ Optimization complete — $sites_changed site(s) refreshed; publishing is queued and verified separately"
 elif [[ "$response_state" == "empty" ]]; then
   echo ""
   echo "✅ Optimization complete — no active sites to optimize"

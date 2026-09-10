@@ -1,120 +1,135 @@
-import { Metadata } from 'next';
-
+import type { Metadata } from "next";
+import MarketingNav from "@/components/MarketingNav";
+import MarketingFooter from "@/components/MarketingFooter";
+import m from "@/components/marketing.module.css";
 export const metadata: Metadata = {
-  title: 'Privacy Policy | AutoLocal.ai',
-  description: 'AutoLocal.ai privacy policy — how we collect, use, and protect your data.',
+  title: "Privacy policy",
+  alternates: { canonical: "/privacy" },
 };
-
-export default function PrivacyPage() {
+export default function Privacy() {
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-gray-300">
-      <div className="max-w-3xl mx-auto px-4 py-20">
-        <h1 className="text-4xl font-black text-white mb-2">Privacy Policy</h1>
-        <p className="text-gray-500 mb-12">Last updated: March 10, 2026</p>
-
-        <div className="space-y-8 text-sm leading-relaxed">
-          <section>
-            <h2 className="text-xl font-bold text-white mb-3">1. Who We Are</h2>
-            <p>AutoLocal.ai (&quot;AutoLocal,&quot; &quot;we,&quot; &quot;us,&quot; or &quot;our&quot;) is a product of Futureproof Music, Inc., a Texas corporation. We build custom websites for local businesses. Our website is located at <a href="https://autolocal.ai" className="text-indigo-400 hover:underline">https://autolocal.ai</a>.</p>
-            <p className="mt-2">Contact: <a href="mailto:support@autolocal.ai" className="text-indigo-400 hover:underline">support@autolocal.ai</a></p>
-          </section>
-
-          <section>
-            <h2 className="text-xl font-bold text-white mb-3">2. Information We Collect</h2>
-            <p className="mb-2">We collect the following information when you use our services:</p>
-            <ul className="list-disc list-inside space-y-1 ml-2">
-              <li><strong className="text-white">Contact information:</strong> Name, email address, phone number</li>
-              <li><strong className="text-white">Business information:</strong> Business name, address, hours, photos, and reviews (pulled from your public Google Business Profile)</li>
-              <li><strong className="text-white">Payment information:</strong> Processed securely by Stripe. We do not store credit card numbers.</li>
-              <li><strong className="text-white">Usage data:</strong> Pages visited, browser type, IP address, and other standard analytics</li>
-              <li><strong className="text-white">Communications:</strong> Emails, SMS messages, and support conversations</li>
-            </ul>
-          </section>
-
-          <section>
-            <h2 className="text-xl font-bold text-white mb-3">3. How We Use Your Information</h2>
-            <ul className="list-disc list-inside space-y-1 ml-2">
-              <li>To build, deliver, and host your custom website</li>
-              <li>To communicate with you about your website, account, and services</li>
-              <li>To send transactional messages (e.g., &quot;your website is ready,&quot; payment confirmations)</li>
-              <li>To send marketing communications (only with your explicit consent)</li>
-              <li>To send SMS messages about your website status and updates (only with your explicit opt-in consent)</li>
-              <li>To process payments via Stripe</li>
-              <li>To improve our services and user experience</li>
-            </ul>
-          </section>
-
-          <section>
-            <h2 className="text-xl font-bold text-white mb-3">4. SMS/Text Messaging</h2>
-            <p className="mb-2">If you opt in to receive SMS messages from AutoLocal.ai:</p>
-            <ul className="list-disc list-inside space-y-1 ml-2">
-              <li>You will receive messages about your website status, updates, and promotional offers</li>
-              <li>Message frequency varies but will not exceed 10 messages per month</li>
-              <li>Message and data rates may apply depending on your carrier</li>
-              <li>You can opt out at any time by replying <strong className="text-white">STOP</strong> to any message</li>
-              <li>Reply <strong className="text-white">HELP</strong> for assistance or contact <a href="mailto:support@autolocal.ai" className="text-indigo-400 hover:underline">support@autolocal.ai</a></li>
-              <li>Your phone number and consent will not be shared with third parties for marketing purposes</li>
-              <li>Consent to receive SMS is not a condition of purchase</li>
-            </ul>
-          </section>
-
-          <section>
-            <h2 className="text-xl font-bold text-white mb-3">5. How We Share Your Information</h2>
-            <p className="mb-2">We do not sell your personal information. We may share data with:</p>
-            <ul className="list-disc list-inside space-y-1 ml-2">
-              <li><strong className="text-white">Service providers:</strong> Stripe (payments), Twilio (SMS), Resend (email), Railway (hosting) — only as needed to provide our services</li>
-              <li><strong className="text-white">Legal requirements:</strong> If required by law, court order, or government regulation</li>
-            </ul>
-            <p className="mt-2">We do not share your opt-in consent or phone number with any third parties for their own marketing purposes.</p>
-          </section>
-
-          <section>
-            <h2 className="text-xl font-bold text-white mb-3">6. Data Security</h2>
-            <p>We use industry-standard security measures including SSL encryption, secure payment processing via Stripe, and access controls to protect your data. However, no method of transmission over the internet is 100% secure.</p>
-          </section>
-
-          <section>
-            <h2 className="text-xl font-bold text-white mb-3">7. Data Retention</h2>
-            <p>We retain your information for as long as your account is active or as needed to provide services. If you cancel your hosting, we retain basic records for up to 12 months for legal and accounting purposes, then delete them.</p>
-          </section>
-
-          <section>
-            <h2 className="text-xl font-bold text-white mb-3">8. Your Rights</h2>
-            <p className="mb-2">You have the right to:</p>
-            <ul className="list-disc list-inside space-y-1 ml-2">
-              <li>Access, correct, or delete your personal information</li>
-              <li>Opt out of marketing communications at any time</li>
-              <li>Opt out of SMS by replying STOP</li>
-              <li>Request a copy of your data</li>
-            </ul>
-            <p className="mt-2">To exercise these rights, email <a href="mailto:support@autolocal.ai" className="text-indigo-400 hover:underline">support@autolocal.ai</a>.</p>
-          </section>
-
-          <section>
-            <h2 className="text-xl font-bold text-white mb-3">9. Cookies</h2>
-            <p>We use essential cookies for site functionality and analytics cookies to understand how visitors use our site. You can disable cookies in your browser settings.</p>
-          </section>
-
-          <section>
-            <h2 className="text-xl font-bold text-white mb-3">10. Children&apos;s Privacy</h2>
-            <p>Our services are not directed to individuals under 18. We do not knowingly collect information from children.</p>
-          </section>
-
-          <section>
-            <h2 className="text-xl font-bold text-white mb-3">11. Changes to This Policy</h2>
-            <p>We may update this privacy policy from time to time. We will notify you of material changes by email or by posting a notice on our website.</p>
-          </section>
-
-          <section>
-            <h2 className="text-xl font-bold text-white mb-3">12. Contact Us</h2>
-            <p>If you have questions about this privacy policy, contact us at:</p>
-            <p className="mt-2">
-              Futureproof Music, Inc.<br />
-              Email: <a href="mailto:support@autolocal.ai" className="text-indigo-400 hover:underline">support@autolocal.ai</a>
-            </p>
-          </section>
-        </div>
-      </div>
+    <div className={m.surface}>
+      <MarketingNav />
+      <main className={m.prose}>
+        <h1>Privacy policy</h1>
+        <p>Updated September 10, 2026</p>
+        <h2>Who we are</h2>
+        <p>
+          AutoLocal.ai is operated by Futureproof Music, Inc. We provide website
+          and local visibility tools for business owners. For privacy questions,
+          data requests, or account help, contact{" "}
+          <a href="mailto:brian@autolocal.ai">brian@autolocal.ai</a>.
+        </p>
+        <h2>Information used to provide the service</h2>
+        <p>
+          We store the account and business details you submit, including your
+          email, services, contact details, website content, and uploaded
+          images. When someone contacts your business through an AutoLocal
+          website, we store their inquiry, contact information, status, and
+          follow-up notes for your business. Inquiry records may include the
+          referring page and campaign parameters so you can understand how
+          visitors found you.
+        </p>
+        <p>
+          Your business content becomes public when you approve publication.
+          Your account credentials, private notes, and customer inquiries are
+          not part of the public website. Do not submit sensitive medical,
+          financial, payment-card, or identity-document information through an
+          inquiry form.
+        </p>
+        <h2>Google connections</h2>
+        <p>
+          Public business lookup uses Google Maps listing information to help
+          you enter your details. This is separate from connecting an account.
+          If you choose to connect Google Business Profile, we access the
+          business accounts and locations you can manage, the selected profile’s
+          business information, and available performance data. Profile changes
+          require your specific approval in the workspace. If you connect Search
+          Console, we read the properties available to your account and
+          search-performance data for the property you select.
+        </p>
+        <p>
+          Connection credentials are stored encrypted on the server. We use
+          Google data only to provide the visible connection,
+          profile-management, and reporting features you request. We do not sell
+          it, use it for targeted advertising, or use it to train
+          general-purpose AI models. AutoLocal’s use and transfer of information
+          received from Google APIs follows the{" "}
+          <a
+            href="https://developers.google.com/terms/api-services-user-data-policy"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Google API Services User Data Policy
+          </a>
+          , including its Limited Use requirements.
+        </p>
+        <p>
+          You can disconnect a Google service in your workspace or revoke
+          AutoLocal’s access in your Google account. Disconnecting removes the
+          saved connection credentials and stops further access through that
+          connection. Contact us to request removal of retained reports and
+          related account data. We may access connected data for support only
+          with your permission, or as necessary for security or legal
+          obligations.
+        </p>
+        <h2>Service providers</h2>
+        <p>
+          We use Supabase for accounts, database, and image storage; Railway and
+          Vercel for application and website hosting; Stripe for payments; and
+          configured email providers such as Resend for transactional delivery.
+          We do not store full card numbers. Google processes business searches
+          and authorized connection requests. Providers receive information
+          needed for their role. If you ask for AI-assisted content, relevant
+          business content may be processed by the configured AI provider;
+          customer inquiry details and Google connection credentials are not
+          needed for that feature.
+        </p>
+        <h2>Messages and consent</h2>
+        <p>
+          We use account and inquiry details to provide the service and respond
+          to requests. Signing in or sending a contact form does not subscribe
+          you to marketing. Marketing requires a separate opt-in, and you can
+          withdraw it. We do not share your marketing consent or phone number
+          for another organization’s marketing.
+        </p>
+        <h2>Browser storage and cookies</h2>
+        <p>
+          Essential cookies keep you signed in. An unfinished website draft is
+          stored in your browser tab. If you verify your email during setup, a
+          pending copy is available in the same browser for up to 30 minutes so
+          the draft can continue in a new tab. It is removed after a successful
+          save or when an expired copy is opened. Shared-device users should
+          close their session and clear browser storage when finished. This
+          version does not load advertising or optional analytics cookies by
+          default.
+        </p>
+        <h2>Retention and your choices</h2>
+        <p>
+          We retain account and business information while it is needed to
+          provide the service, handle support, prevent abuse, or meet
+          recordkeeping obligations. You can edit business details in the
+          workspace and request access, export, correction, or deletion by
+          email. We verify account ownership before fulfilling a request. Some
+          billing or security records may need to be retained; we will explain
+          any applicable limit when responding.
+        </p>
+        <h2>Security and audience</h2>
+        <p>
+          We use authenticated owner access, protected server credentials,
+          encrypted Google connection credentials, and encrypted network
+          transport. No system can promise complete security. AutoLocal’s
+          business-owner tools are intended for adults authorized to act for a
+          business.
+        </p>
+        <h2>Updates</h2>
+        <p>
+          We update this policy when the service or data practices change.
+          Material changes to connected-data use require a new disclosure and,
+          where required, renewed consent before that use begins.
+        </p>
+      </main>
+      <MarketingFooter />
     </div>
   );
 }

@@ -1,23 +1,7 @@
-import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { NextResponse } from 'next/server'
-
+import {listOwnerSites,apiErrorResponse} from '@/lib/owner-access'
 export async function GET() {
-  const supabase = createServerSupabaseClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-  if (authError || !user?.email) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  const { data: sites, error } = await supabase
-    .from('website_previews')
-    .select('id, slug, business_name, city, state, template, hosting_status, hero_image_url, created_at')
-    .eq('email', user.email)
-    .order('created_at', { ascending: false })
-
-  if (error || !sites || sites.length === 0) {
-    return NextResponse.json({ error: 'No websites found' }, { status: 404 })
-  }
-
-  return NextResponse.json(sites)
+  try {
+    const {sites}=await listOwnerSites()
+    return Response.json(sites.map(site=>({id:site.id,slug:site.slug,business_name:site.business_name,city:site.city,state:site.state,template:site.template,hosting_status:site.hosting_status,subscription_status:site.subscription_status||null,has_billing:!!site.stripe_customer_id,hero_image_url:site.hero_image_url,created_at:site.created_at})))
+  } catch(error) {return apiErrorResponse(error)}
 }

@@ -1,6 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // Static HTML generators for deployed client sites
 // Each template mirrors its React counterpart in src/components/templates/
+import { PROFESSIONAL_CSS, escapeHtml, isProfessionalTemplate, renderProfessionalSite, resolveSiteUrl, safeWebUrl, siteStructuredData, type SiteRenderOptions } from '@/components/templates/professional-renderer'
+import { inquiryRuntimeScript } from '@/components/templates/inquiry-runtime'
+import { categoryToProfessionalTemplate } from '@/components/templates/types'
 
 interface SiteData {
   slug: string
@@ -55,7 +58,7 @@ const HERO_IMAGES: Record<string, string> = {
 }
 
 function getHeroImg(d: SiteData): string {
-  return d.hero_image_url || HERO_IMAGES[d.category] || HERO_IMAGES.general
+  return safeWebUrl(d.hero_image_url) || 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800"%3E%3Crect width="1200" height="800" fill="%23142e29"/%3E%3Cpath d="M200 800L700 0M500 800L1000 0" stroke="%23395951" stroke-width="1"/%3E%3C/svg%3E'
 }
 
 function getCtaText(d: SiteData): string {
@@ -64,7 +67,7 @@ function getCtaText(d: SiteData): string {
 }
 
 function getEmail(d: SiteData): string {
-  return d.contact_email || d.email || ''
+  return d.contact_email || ''
 }
 
 /** Gallery images with hero image filtered out to avoid duplication */
@@ -1185,11 +1188,27 @@ const TEMPLATE_MAP: Record<string, (d: SiteData) => string> = {
   receipt: receiptTemplate,
 }
 
-export function generateStaticHtml(data: any, template: string): string {
-  const renderFn = TEMPLATE_MAP[template] || TEMPLATE_MAP.bold
+/** Archived generators are retained for reference; production exports use the tested shared renderer. */
+function generateArchivedStaticHtml(data: any, template: string, options: SiteRenderOptions = {}): string {
+  const selected = template || categoryToProfessionalTemplate(data.category || '')
+  if (isProfessionalTemplate(selected) || !(selected in TEMPLATE_MAP)) {
+    return generateProfessionalHtml(data, isProfessionalTemplate(selected) ? selected : categoryToProfessionalTemplate(data.category || ''), options)
+  }
+  // Keep older designs available, but exclude unconfirmed testimonials and private account emails.
+  data = { ...data, email: null, reviews: data.reviews_verified ? data.reviews || [] : [],
+    google_rating: data.reviews_verified ? data.google_rating : null,
+    google_review_count: data.reviews_verified ? data.google_review_count : 0,
+    logo_url: safeWebUrl(data.logo_url) || null,
+    hero_image_url: safeWebUrl(data.hero_image_url) || null,
+    gallery_images: Array.isArray(data.gallery_images) ? data.gallery_images.map(safeWebUrl).filter(Boolean) : [],
+    cta_url: /^tel:\+?[\d\s()-]+$/i.test(data.cta_url || '') ? `tel:${data.cta_url.slice(4).replace(/[^+\d]/g, '')}` : safeWebUrl(data.cta_url) || null,
+    brand_color_primary: /^#[0-9a-f]{6}$/i.test(data.brand_color_primary || '') ? data.brand_color_primary : '#142e29',
+    brand_color_accent: /^#[0-9a-f]{6}$/i.test(data.brand_color_accent || '') ? data.brand_color_accent : '#506c52',
+  }
+  const renderFn = TEMPLATE_MAP[selected]
   const body = renderFn(data as SiteData)
 
-  const siteUrl = data.website_current || `https://${data.slug}.autolocal.ai`
+  const siteUrl = resolveSiteUrl(data, options.siteUrl)
   const desc = esc(data.description || data.tagline || `${data.business_name} — serving ${data.city || 'the community'}`)
   const title = `${esc(data.business_name)} — ${esc(data.city || '')}${data.state ? `, ${esc(data.state)}` : ''}`
 
@@ -1246,6 +1265,8 @@ export function generateStaticHtml(data: any, template: string): string {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="autolocal-site" content="${esc(data.slug)}">
+<meta name="robots" content="index,follow">
 <title>${title}</title>
 <meta name="description" content="${desc}">
 <!-- Open Graph / Social sharing -->
@@ -1263,7 +1284,7 @@ ${data.hero_image_url ? `<meta name="twitter:image" content="${esc(data.hero_ima
 <!-- Canonical URL -->
 <link rel="canonical" href="${esc(siteUrl)}">
 <!-- Structured Data for Search + AI -->
-<script type="application/ld+json">${JSON.stringify(jsonLd)}</script>
+<script type="application/ld+json">${JSON.stringify(jsonLd).replace(/</g, '\\u003c')}</script>
 ${data.logo_url ? `<link rel="icon" href="${esc(data.logo_url)}" type="image/png">` : `<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌐</text></svg>">`}
 <script src="https://cdn.tailwindcss.com"></script>
 <style>*{scroll-behavior:smooth}body{margin:0}</style>
@@ -1273,4 +1294,44 @@ ${body}
 ${reviewCarouselScript(data.reviews?.length || 0)}
 </body>
 </html>`
+}
+
+function generateProfessionalHtml(data: any, template: string, options: SiteRenderOptions): string {
+  const e = escapeHtml
+  const siteUrl = resolveSiteUrl(data, options.siteUrl)
+  const title = [data.business_name, [data.city, data.state].filter(Boolean).join(', ')].filter(Boolean).join(' | ')
+  const description = data.description || data.tagline || [data.business_name, data.category, data.city].filter(Boolean).join(' · ')
+  const image = safeWebUrl(data.hero_image_url)
+  const logo = safeWebUrl(data.logo_url)
+  const mode = options.mode || (data.demo ? 'demo' : 'live')
+  const body = renderProfessionalSite(data, template, { ...options, mode, apiBaseUrl: options.apiBaseUrl || process.env.NEXT_PUBLIC_SITE_URL || 'https://autolocal.ai' })
+  return `<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="autolocal-site" content="${e(data.slug)}">
+<title>${e(title)}</title><meta name="description" content="${e(description)}">
+<meta name="robots" content="${mode === 'live' ? 'index,follow' : 'noindex,nofollow'}">
+<link rel="canonical" href="${e(siteUrl)}">
+<meta property="og:type" content="website"><meta property="og:title" content="${e(title)}"><meta property="og:description" content="${e(description)}"><meta property="og:url" content="${e(siteUrl)}">
+${image ? `<meta property="og:image" content="${e(image)}">` : ''}
+<meta name="twitter:card" content="${image ? 'summary_large_image' : 'summary'}">
+${logo ? `<link rel="icon" href="${e(logo)}">` : ''}
+<script type="application/ld+json">${JSON.stringify(siteStructuredData(data, siteUrl)).replace(/</g, '\\u003c')}</script>
+<style>body{margin:0}html{scroll-behavior:smooth}@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}${PROFESSIONAL_CSS}</style>
+</head><body>${body}<script>${inquiryRuntimeScript()}</script></body></html>`
+}
+
+/** Files for one public site; add service URLs only when actual service pages exist. */
+export function generateStaticHtml(data: any, template: string, options: SiteRenderOptions = {}): string {
+  return generateProfessionalHtml(data, isProfessionalTemplate(template) ? template : categoryToProfessionalTemplate(data.category || ''), options)
+}
+
+export function generateStaticSiteFiles(data: any, template: string, options: SiteRenderOptions = {}): { file: string; data: string }[] {
+  const siteUrl = resolveSiteUrl(data, options.siteUrl)
+  const isPublic = !data.demo && (!options.mode || options.mode === 'live')
+  return [
+    { file: 'index.html', data: generateStaticHtml(data, template, options) },
+    { file: 'robots.txt', data: `User-agent: *\n${isPublic ? 'Allow: /' : 'Disallow: /'}\n${isPublic ? `Sitemap: ${siteUrl}/sitemap.xml\n` : ''}` },
+    { file: 'sitemap.xml', data: `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${isPublic ? `<url><loc>${escapeHtml(siteUrl)}/</loc></url>` : ''}</urlset>` },
+  ]
 }

@@ -1,152 +1,128 @@
-'use client'
-import { useState, useEffect, Suspense } from 'react'
-import { useSearchParams } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
-import Link from 'next/link'
-import Image from 'next/image'
-
+"use client";
+import { Suspense, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { ArrowRight, MailCheck } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+import { safeReturnPath } from "@/lib/safe-return-path";
+import MarketingNav from "@/components/MarketingNav";
+import MarketingFooter from "@/components/MarketingFooter";
+import m from "@/components/marketing.module.css";
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-[#09090b]" />}>
-      <LoginContent />
+    <Suspense fallback={<main>Loading sign in…</main>}>
+      <Login />
     </Suspense>
-  )
+  );
 }
-
-function LoginContent() {
-  const searchParams = useSearchParams()
-  const prefillEmail = searchParams.get('email') || ''
-  const redirect = searchParams.get('redirect') || ''
-  const [email, setEmail] = useState(prefillEmail)
-  const [sent, setSent] = useState(false)
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
-  const supabase = createClient()
-
-  // Auto-submit if email is prefilled from URL
-  useEffect(() => {
-    if (prefillEmail && !sent) {
-      setEmail(prefillEmail)
-      // Small delay so UI renders first
-      const timer = setTimeout(() => {
-        document.getElementById('login-form')?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
-      }, 500)
-      return () => clearTimeout(timer)
+function Login() {
+  const params = useSearchParams(),
+    next = safeReturnPath(params.get("next") || params.get("redirect"));
+  const [email, setEmail] = useState(params.get("email") || ""),
+    [sent, setSent] = useState(false),
+    [busy, setBusy] = useState(false),
+    [error, setError] = useState(
+      params.get("error")
+        ? "That sign-in link could not be verified. Request a new one below."
+        : "",
+    );
+  async function send(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      const { error: err } = await createClient().auth.signInWithOtp({
+        email: email.trim(),
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
+        },
+      });
+      if (err) throw err;
+      setSent(true);
+    } catch {
+      setError(
+        "We couldn’t send the sign-in link. Please check your email address and try again in a moment.",
+      );
+    } finally {
+      setBusy(false);
     }
-  }, [prefillEmail]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const handleMagicLink = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setError('')
-
-    const redirectPath = redirect || '/dashboard'
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(redirectPath)}`,
-      },
-    })
-
-    if (error) {
-      setError(error.message)
-      setLoading(false)
-      return
-    }
-
-    setSent(true)
-    setLoading(false)
   }
-
   return (
-    <div className="min-h-screen bg-[#09090b] flex flex-col items-center justify-center px-4 relative overflow-hidden">
-      {/* Background gradient orbs — matching home page */}
-      <div className="absolute top-1/3 -left-32 w-96 h-96 bg-indigo-600/20 rounded-full blur-[120px] animate-pulse" />
-      <div className="absolute bottom-1/3 -right-32 w-96 h-96 bg-purple-600/20 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '1s' }} />
-
-      <div className="relative z-10 w-full max-w-md">
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center gap-2.5">
-            <Image src="/logo.png" alt="AutoLocal.ai" width={40} height={40} className="rounded-xl" />
-            <span className="text-2xl font-black bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
-              AutoLocal.ai
-            </span>
-          </Link>
-          <p className="text-gray-500 text-sm mt-2">Client Dashboard</p>
-        </div>
-
-        {/* Card */}
-        <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-8 backdrop-blur-sm">
-          {sent ? (
-            <div className="text-center space-y-4">
-              <div className="text-5xl">✉️</div>
-              <h2 className="text-xl font-bold text-white">Check your email</h2>
-              <p className="text-gray-400">
-                We sent a magic link to <span className="text-indigo-400 font-medium">{email}</span>
-              </p>
-              <p className="text-gray-600 text-sm">
-                Click the link in the email to sign in. It expires in 1 hour.
-              </p>
-              <button
-                onClick={() => { setSent(false); setEmail('') }}
-                className="text-sm text-indigo-400 hover:text-indigo-300 transition mt-4"
-              >
-                ← Use a different email
+    <div className={m.surface}>
+      <MarketingNav />
+      <main className={m.prose} style={{ maxWidth: 540, minHeight: "65vh" }}>
+        {sent ? (
+          <>
+            <MailCheck size={36} color="#347346" />
+            <h1 style={{ fontSize: 37, marginTop: 25 }}>Check your inbox.</h1>
+            <p>
+              Your sign-in request was accepted for <strong>{email}</strong>.
+              Open the email link to verify your account and continue.
+            </p>
+            <p>
+              Use this browser to open the link. If you don’t see it, check your
+              spam folder. Your pending website draft is available in this
+              browser for 30 minutes.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setSent(false);
+                setError("");
+              }}
+              className={m.buttonOutline}
+            >
+              Use another email or resend
+            </button>
+          </>
+        ) : (
+          <>
+            <p className={m.eyebrow}>
+              {params.get("reason") === "save-preview"
+                ? "Keep your preview safe"
+                : "Welcome to your workspace"}
+            </p>
+            <h1>
+              {params.get("reason") === "save-preview"
+                ? "Save it. Make it yours."
+                : "A little less to manage."}
+            </h1>
+            <p>
+              Enter your email and we’ll send a secure sign-in link. No password
+              to remember.
+            </p>
+            <form className={m.form} onSubmit={send}>
+              <label className={m.field}>
+                Your email
+                <input
+                  required
+                  type="email"
+                  autoComplete="email"
+                  maxLength={254}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@yourbusiness.com"
+                />
+              </label>
+              {error && (
+                <p className={m.error} role="alert">
+                  {error}
+                </p>
+              )}
+              <button disabled={busy} className={m.button}>
+                {busy ? "Sending your link…" : "Email me a sign-in link"}
+                <ArrowRight size={17} />
               </button>
-            </div>
-          ) : (
-            <>
-              <h2 className="text-xl font-bold text-white text-center mb-2">Sign in to your dashboard</h2>
-              <p className="text-gray-500 text-center text-sm mb-6">
-                Enter the email associated with your website and we&apos;ll send you a magic link.
-              </p>
-
-              <form id="login-form" onSubmit={handleMagicLink} className="space-y-4">
-                <div>
-                  <input
-                    type="email"
-                    placeholder="your@email.com"
-                    value={email}
-                    onChange={e => setEmail(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 outline-none transition"
-                    required
-                    autoFocus
-                  />
-                </div>
-
-                {error && <p className="text-red-400 text-sm">{error}</p>}
-
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full py-3 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-500 transition disabled:opacity-50 shadow-lg shadow-indigo-500/20"
-                >
-                  {loading ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      Sending...
-                    </span>
-                  ) : (
-                    'Send Magic Link'
-                  )}
-                </button>
-              </form>
-
-              <p className="text-center text-xs text-gray-600 mt-6">
-                No password needed — just click the link in your email.
-              </p>
-            </>
-          )}
-        </div>
-
-        <p className="text-center text-sm text-gray-600 mt-6">
-          Don&apos;t have a website yet?{' '}
-          <Link href="/" className="text-indigo-400 hover:text-indigo-300 transition">
-            Get one free →
-          </Link>
-        </p>
-      </div>
+            </form>
+            <p className={m.note}>
+              By continuing, you agree to our <Link href="/terms">terms</Link>{" "}
+              and <Link href="/privacy">privacy policy</Link>. This does not
+              subscribe you to marketing emails.
+            </p>
+          </>
+        )}
+      </main>
+      <MarketingFooter />
     </div>
-  )
+  );
 }

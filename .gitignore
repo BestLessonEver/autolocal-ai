@@ -3,6 +3,27 @@ node_modules
 .env.local
 .env.local
 .env
+.env.*
+!.env.example
+*.tsbuildinfo
 supabase/.temp/
 client-sites/
 node_modules
+
+/.next-dev/
+/.runtime/
+
+# Local operator records contain account inventories and private release evidence.
+/docs/CONNECTED-ACCOUNT-AUDIT.md
+/docs/CLOUD-BACKEND-INSPECTION.md
+/docs/CLOUD-MIGRATION-PREFLIGHT.md
+/docs/HOSTING-EMAIL-CONFIGURATION-STATUS.md
+/docs/PROVIDER-CONFIGURATION-STATUS.md
+/docs/STRIPE-CONFIGURATION-STATUS.md
+/docs/RAILWAY-RELEASE-STATUS.md
+/docs/REBUILD-VERIFICATION.md
+/docs/STAGING-STATUS.md
+/docs/REVIVAL.md
+/docs/LAUNCH-REBUILD.md
+/docs/RELEASE-UX-AUDIT.md
+/docs/GOOGLE-VERIFICATION-READINESS.md

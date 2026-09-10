@@ -24,8 +24,8 @@ function useFadeIn() {
 }
 
 function FadeIn({ children, className = '' }: { children: React.ReactNode; className?: string }) {
-  const fade = useFadeIn()
-  return <div ref={fade.ref} className={`${fade.className} ${className}`}>{children}</div>
+  // Keep content visible without depending on observers or JavaScript animation.
+  return <div className={className}>{children}</div>
 }
 
 /* ── Gradient helpers ── */
