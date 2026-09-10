@@ -98,6 +98,8 @@ Keep billing, publishing, domain purchases, email, and GBP writes disabled where
 
 Before enabling production traffic: recheck page/canonical/sitemap/robots behavior; mobile navigation; sign-up/login/email verification; business intake; all three previews; saving without publishing; exact-revision publish; inquiry delivery; billing/portal; Google selection/proposal approval; errors; and a failed provider request. Confirm no old doorway pages, unsupported statistics, placeholder audits, fake progress screens, or promises of guaranteed rankings remain public.
 
+Run `node scripts/operations/verify-public-site.mjs https://autolocal.ai --require-launch-services` against the intended deployed application. It makes only anonymous GET requests, follows no redirects, and prints pass/fail checks without response bodies. It verifies public canonical URLs, sitemap scope, production robots rules, non-indexed private/demo pages, anonymous API denials and availability flags. Use `--staging` for a deliberately non-indexed environment; a loopback origin also requires `--allow-local`. This public-surface check complements the authenticated/provider checks above and never establishes complete launch readiness by itself. Record the provider's exact deployed commit separately.
+
 Rollback means disabling new side effects first, preserving queued records and paid-order evidence, and returning traffic to a previously verified application deployment. Do not delete private data or reset registrar purchase intents as a rollback shortcut.
 
 ## Primary references
