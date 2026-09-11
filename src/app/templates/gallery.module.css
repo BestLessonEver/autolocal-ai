@@ -52,8 +52,8 @@
   .preview iframe { width: 300%; height: 300%; transform: scale(.3333333333); }
 }
 @media (max-width: 700px) {
-  .shell { padding: 40px 20px 56px; }
-  .intro { margin-bottom: 46px; }
+  .shell { padding: 32px 20px 56px; }
+  .intro { margin-bottom: 32px; }
   .eyebrow { font-size: 10px; line-height: 1.6; max-width: 260px; margin-bottom: 18px; }
   .intro > p:last-of-type { font-size: 16px; }
   .familyNav { gap: 8px; }
@@ -79,7 +79,6 @@
 }
 @media (max-width: 360px) {
   .shell { padding-left: 16px; padding-right: 16px; }
-  .familyNav a { width: 100%; }
   .actions { gap: 8px 12px; }
   .button { padding: 12px 14px; gap: 14px; }
 }

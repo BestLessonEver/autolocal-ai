@@ -12,8 +12,8 @@ export const metadata: Metadata = {
 }
 
 const families = [
-  { id: 'professional', title: 'Polished & professional', description: 'A confident first impression for your services, studio, or practice.' },
-  { id: 'playful', title: 'Playful & unexpected', description: 'A little nostalgia. A lot of personality. For businesses that like to do things their own way.' },
+  { id: 'professional', label: 'Professional', title: 'Polished & professional', description: 'A confident first impression for your services, studio, or practice.' },
+  { id: 'playful', label: 'Playful', title: 'Playful & unexpected', description: 'A little nostalgia. A lot of personality. For businesses that like to do things their own way.' },
 ] as const
 
 export default function TemplatesPage() {
@@ -24,9 +24,9 @@ export default function TemplatesPage() {
         <div className={styles.intro}>
           <p className={styles.eyebrow}>Make a first impression that feels like you</p>
           <h1>Good looks.<br />Real personality.</h1>
-          <p>Quietly refined or wonderfully weird. Pick your starting point, then bring your services, photos, and voice. Every design makes room for the small screen.</p>
+          <p>Six designs, from refined to wonderfully weird. Make one yours with your services, photos, and voice.</p>
           <nav className={styles.familyNav} aria-label="Design styles">
-            {families.map(family => <a key={family.id} href={`#${family.id}`}>{family.title} <span aria-hidden="true">↓</span></a>)}
+            {families.map(family => <a key={family.id} href={`#${family.id}`}>{family.label} <span aria-hidden="true">↓</span></a>)}
           </nav>
         </div>
 
@@ -41,7 +41,7 @@ export default function TemplatesPage() {
                 <div className={styles.previewWrap}>
                   <div className={styles.previewLabel} aria-hidden="true"><span className={styles.desktopLabel}>Desktop preview</span><span className={styles.mobileLabel}>Phone preview</span><span>Live design ↗</span></div>
                   <div className={styles.preview}>
-                    <iframe inert tabIndex={-1} aria-hidden="true" loading="lazy" title={`${template.name} design preview`} src={`/templates/${template.id}?embed=1`} />
+                    <iframe inert tabIndex={-1} aria-hidden="true" loading={template.id === 'summit' ? 'eager' : 'lazy'} title={`${template.name} design preview`} src={`/templates/${template.id}?embed=1`} />
                     <Link className={styles.previewLink} href={`/templates/${template.id}`} aria-label={`Explore ${template.name}`} />
                   </div>
                 </div>
