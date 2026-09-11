@@ -7,6 +7,7 @@ import {
   parseBusinessHours,
 } from "@/lib/onboarding-validation";
 import s from "./Workspace.module.css";
+import { SITE_TEMPLATES, isSiteTemplate } from "./templates/types";
 export default function OwnerSiteEditor({
   site,
   onSave,
@@ -54,7 +55,7 @@ export default function OwnerSiteEditor({
         city: draft.city,
         state: draft.state,
         show_address: draft.show_address,
-        ...(["summit", "atelier", "ledger"].includes(draft.template)
+        ...(isSiteTemplate(draft.template)
           ? { template: draft.template }
           : {}),
         services: draft.services,
@@ -141,12 +142,10 @@ export default function OwnerSiteEditor({
               value={draft.template}
               onChange={(e) => update("template", e.target.value)}
             >
-              {!["summit", "atelier", "ledger"].includes(draft.template) && (
+              {!isSiteTemplate(draft.template) && (
                 <option value={draft.template}>Current legacy design</option>
               )}
-              <option value="summit">Summit · Home services</option>
-              <option value="atelier">Atelier · Personal services</option>
-              <option value="ledger">Ledger · Professional services</option>
+              {SITE_TEMPLATES.map(template => <option key={template.id} value={template.id}>{template.name} · {template.audience}</option>)}
             </select>
           </label>
         </div>

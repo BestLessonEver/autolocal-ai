@@ -1,5 +1,6 @@
 import { ApiError } from '@/lib/owner-access'
 import { cleanText, validEmail } from '@/lib/lead-intake'
+import { isSiteTemplate } from '@/components/templates/types'
 export function safeUrl(value: unknown): string | null {
   const text=cleanText(value,2048)
   if (!text) return null
@@ -29,7 +30,7 @@ export function siteUpdates(body: Record<string,unknown>) {
   }
   for(const field of ['hero_image_url','logo_url']) if(body[field]!==undefined) updates[field]=safeUrl(body[field])
   if(body.template!==undefined) {
-    if(!['summit','atelier','ledger'].includes(String(body.template))) throw new ApiError(400,'Choose a supported website design.')
+    if(typeof body.template!=='string'||!isSiteTemplate(body.template)) throw new ApiError(400,'Choose a supported website design.')
     updates.template=body.template
   }
   if(body.category!==undefined) updates.category=normalizeCategory(body.category)

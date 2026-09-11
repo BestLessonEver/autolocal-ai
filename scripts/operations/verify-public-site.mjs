@@ -49,10 +49,26 @@ for (const path of ['/', '/templates', '/about', '/contact', '/privacy', '/terms
     assert.equal(directives.includes('noindex'), staging)
   })
 }
-for (const path of ['/start', '/demo', '/dashboard', '/templates/summit', '/templates/atelier', '/templates/ledger']) {
+const templateIds = ['summit', 'atelier', 'ledger', 'win95', 'myspace', 'receipt']
+for (const path of ['/start', '/demo', '/dashboard', ...templateIds.map(template => `/templates/${template}`)]) {
   await check(`Non-indexed page ${path}`, async () => {
     const { response, body } = await read(path)
     assert.ok(robotsDirectives(load(body), response).includes('noindex'))
+  })
+}
+for (const template of templateIds) {
+  await check(`Rendered template demo ${template}`, async () => {
+    const { response, body } = await read(`/templates/${template}?embed=1`)
+    const document = load(body)
+    assert.ok(robotsDirectives(document, response).includes('noindex'))
+    assert.equal(document(`.al-site.al-${template}`).length, 1)
+    assert.equal(document('h1').length, 1)
+    assert.equal(document('form[data-al-inquiry]').attr('data-mode'), 'demo')
+    assert.equal(document('a[href^="tel:"],a[href^="mailto:"]').length, 0)
+    document('a[href^="#"]').each((_, element) => {
+      const target = document(element).attr('href').slice(1)
+      assert.ok(document('[id]').toArray().some(node => document(node).attr('id') === target))
+    })
   })
 }
 await check('Sitemap contains only public canonical URLs', async () => {

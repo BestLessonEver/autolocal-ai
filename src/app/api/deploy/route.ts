@@ -3,7 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { requireOwnerSite, apiErrorResponse, ApiError } from '@/lib/owner-access'
 import { queueDeployment } from '@/lib/deployment-service'
 import { requireCapability } from '@/lib/integration-config'
-import { isProfessionalTemplate } from '@/components/templates/professional-renderer'
+import { isSiteTemplate } from '@/components/templates/types'
 
 export async function POST(req: Request) {
   try {
@@ -22,7 +22,7 @@ export async function POST(req: Request) {
       context = { db, site }
     } else context = await requireOwnerSite(selector)
     if (!['active', 'pending_cancel'].includes(context.site.hosting_status)) throw new ApiError(402, 'Activate hosting before publishing.')
-    if (!isProfessionalTemplate(context.site.template)) throw new ApiError(409, 'Choose and review a current design before publishing.')
+    if (!isSiteTemplate(context.site.template)) throw new ApiError(409, 'Choose and review a current design before publishing.')
     const jobId = await queueDeployment(context.db, context.site)
     return Response.json({ success: true, status: 'queued', jobId }, { status: 202 })
   } catch (error) { return apiErrorResponse(error) }
