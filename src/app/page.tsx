@@ -24,7 +24,7 @@ export const metadata: Metadata = {
 const faqs = [
   [
     "I don’t have a website. Where do I start?",
-    "Start with your business name and the area you serve. You can use your public Google listing or enter your information yourself. Review your details, choose a design, and see a private preview before deciding to launch.",
+    "Start with your business name and the area you serve. You can use your public Google listing or enter your information yourself. Select your listing to see a website with the available photos, hours, and contact details already in place. Adjust anything you like and save your private preview.",
   ],
   [
     "What if I already have a website?",
@@ -163,12 +163,12 @@ export default function HomePage() {
                 [
                   "01",
                   "Tell us what you do.",
-                  "Find your business or start from scratch. Confirm your services, service area, and the best way for customers to reach you.",
+                  "Select your Google listing. Your available photos, opening hours, address, and phone go straight into your website.",
                 ],
                 [
                   "02",
                   "Make it feel like you.",
-                  "Choose a professional design. Add your real photos and your own details. Preview it on a phone and desktop before you launch.",
+                  "See your website immediately. Try another design or edit a detail when you want to. Save it to your account when you’re ready.",
                 ],
                 [
                   "03",

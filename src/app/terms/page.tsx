@@ -66,7 +66,7 @@ export default function Terms() {
         </p>
         <p>
           Google, Stripe, registrars, and hosting providers have their own terms
-          and availability requirements. Connecting an account grants the
+          and availability requirements. Public listing lookup is subject to the <a href="https://www.google.com/help/terms_maps/" target="_blank" rel="noopener noreferrer">Google Maps Terms of Service</a>. Connecting an account grants the
           permissions shown in that provider’s consent screen. Specific
           business-profile changes require your approval. You can revoke a
           connection, and you must tell us if your authority to manage a

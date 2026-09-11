@@ -1,3 +1,5 @@
+import type { GoogleListingAttribution, GoogleListingPhoto } from '@/lib/google-listing-types'
+
 export interface PreviewData {
   id: string
   slug: string
@@ -13,6 +15,9 @@ export interface PreviewData {
   hero_crop?: number
   site_mode?: 'business' | 'individual'
   gallery_images: string[]
+  google_photos?: GoogleListingPhoto[]
+  google_source_url?: string | null
+  google_attributions?: GoogleListingAttribution[]
   services: { name: string; description: string; price?: string }[]
   hours: Record<string, string>
   address: string | null

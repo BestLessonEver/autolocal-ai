@@ -8,6 +8,7 @@ export function publicSiteData(site: Record<string, unknown>): PreviewData {
   const cta = text('cta_url') || ''
   const ctaUrl = /^tel:\+?[\d\s()-]+$/i.test(cta) ? `tel:${cta.slice(4).replace(/[^+\d]/g, '')}` : safeWebUrl(cta) || null
   const services = Array.isArray(site.services) ? site.services.filter(service => service && typeof service.name === 'string').map(service => ({ name: service.name, description: typeof service.description === 'string' ? service.description : '', ...(typeof service.price === 'string' ? { price: service.price } : {}) })) : []
+  const attributions = (value: unknown) => Array.isArray(value) ? value.filter(item => item && typeof item.displayName === 'string').map(item => ({ displayName: item.displayName, uri: safeWebUrl(item.uri) || null })) : []
   return {
     id: '', email: null, slug: text('slug') || '', business_name: text('business_name') || '',
     tagline: text('tagline'), description: text('description'), category: text('category') || '',
@@ -15,6 +16,9 @@ export function publicSiteData(site: Record<string, unknown>): PreviewData {
     logo_url: safeWebUrl(site.logo_url) || null, hero_image_url: safeWebUrl(site.hero_image_url) || null, hero_crop: typeof site.hero_crop === 'number' ? Math.min(100, Math.max(0, site.hero_crop)) : 50,
     image_caption: text('image_caption'), site_mode: site.site_mode === 'individual' ? 'individual' : 'business',
     gallery_images: Array.isArray(site.gallery_images) ? site.gallery_images.map(safeWebUrl).filter(Boolean) : [], services,
+    google_photos: Array.isArray(site.google_photos) ? site.google_photos.filter(photo => photo && safeWebUrl(photo.url)).slice(0, 10).map(photo => ({ url: safeWebUrl(photo.url), width: typeof photo.width === 'number' ? photo.width : null, height: typeof photo.height === 'number' ? photo.height : null, attributions: attributions(photo.attributions) })) : [],
+    google_source_url: safeWebUrl(site.google_source_url) || null,
+    google_attributions: attributions(site.google_attributions),
     hours: site.hours && typeof site.hours === 'object' && !Array.isArray(site.hours) ? Object.fromEntries(Object.entries(site.hours).filter(([, value]) => typeof value === 'string')) : {},
     address: site.show_address === false ? null : text('address'), show_address: site.show_address !== false,
     city: text('city'), state: text('state'), phone: text('phone'), contact_email: text('contact_email'),

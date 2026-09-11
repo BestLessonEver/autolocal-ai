@@ -8,6 +8,49 @@ import {
 } from "@/lib/onboarding-validation";
 import s from "./Workspace.module.css";
 import { SITE_TEMPLATES, isSiteTemplate } from "./templates/types";
+
+function editableFields(site: Site, hours: Record<string, string>, areas: string[]): Partial<Site> {
+  const optional = (value: string | null | undefined) => value?.trim() || null;
+  return {
+    business_name: site.business_name.trim(),
+    tagline: optional(site.tagline),
+    description: optional(site.description),
+    phone: optional(site.phone),
+    contact_email: optional(site.contact_email),
+    address: optional(site.address),
+    city: optional(site.city),
+    state: optional(site.state),
+    show_address: site.show_address,
+    ...(isSiteTemplate(site.template) ? { template: site.template } : {}),
+    services: site.services.map(service => ({
+      name: service.name.trim(),
+      description: service.description?.trim() || "",
+      price: service.price?.trim() || "",
+    })),
+    service_areas: areas.map(area => area.trim()).filter(Boolean),
+    faq: site.faq.map(item => ({ question: item.question.trim(), answer: item.answer.trim() })),
+    hours: Object.fromEntries(Object.entries(hours).map(([day, time]) => [day, time.trim()])),
+  };
+}
+
+function sameValue(left: unknown, right: unknown): boolean {
+  if (left === right) return true;
+  if (Array.isArray(left) || Array.isArray(right)) {
+    return Array.isArray(left) && Array.isArray(right) && left.length === right.length &&
+      left.every((value, index) => sameValue(value, right[index]));
+  }
+  if (left && right && typeof left === "object" && typeof right === "object") {
+    const a = left as Record<string, unknown>, b = right as Record<string, unknown>;
+    const keys = Object.keys(a);
+    return keys.length === Object.keys(b).length && keys.every(key => Object.hasOwn(b, key) && sameValue(a[key], b[key]));
+  }
+  return false;
+}
+
+function changedFields(fields: Partial<Site>, baseline: Partial<Site>): Partial<Site> {
+  return Object.fromEntries(Object.entries(fields).filter(([key, value]) => !sameValue(value, baseline[key as keyof Site]))) as Partial<Site>;
+}
+
 export default function OwnerSiteEditor({
   site,
   onSave,
@@ -28,6 +71,8 @@ export default function OwnerSiteEditor({
   );
   const [areasText, setAreasText] = useState(site.service_areas.join(", "));
   const [draft, setDraft] = useState(site);
+  const [baseline, setBaseline] = useState(() => editableFields(site, site.hours || {}, site.service_areas));
+  const imported = site.business_facts.useGoogleListing === true;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -37,36 +82,25 @@ export default function OwnerSiteEditor({
   };
   async function save(e: React.FormEvent) {
     e.preventDefault();
-    if (!validBusinessPhone(draft.phone || "")) {
-      setError("Enter a valid business phone number with 7 to 15 digits.");
-      return;
-    }
-    setBusy(true);
     setError("");
     setNotice("");
     try {
-      const fields = {
-        business_name: draft.business_name,
-        tagline: draft.tagline,
-        description: draft.description,
-        phone: draft.phone,
-        contact_email: draft.contact_email,
-        address: draft.address,
-        city: draft.city,
-        state: draft.state,
-        show_address: draft.show_address,
-        ...(isSiteTemplate(draft.template)
-          ? { template: draft.template }
-          : {}),
-        services: draft.services,
-        service_areas: areasText
-          .split(",")
-          .map((x) => x.trim())
-          .filter(Boolean),
-        faq: draft.faq,
-        hours: parseBusinessHours(hoursText),
-      };
-      await onSave(fields);
+      const fields = editableFields(draft, parseBusinessHours(hoursText), areasText.split(","));
+      const changed = changedFields(fields, baseline);
+      const checkPhone = !imported || (Object.hasOwn(changed, "phone") && Boolean(fields.phone));
+      if (checkPhone && !validBusinessPhone(fields.phone || "")) {
+        setError("Enter a valid business phone number with 7 to 15 digits.");
+        return;
+      }
+      if (!Object.keys(changed).length) {
+        setNotice("There are no changes to save.");
+        return;
+      }
+      setBusy(true);
+      // Fresh Google content is display-only. Saving another field must not
+      // silently convert that content into a permanent owner override.
+      await onSave(imported ? changed : fields);
+      setBaseline(fields);
       setNotice(
         demo
           ? "Example changes saved for this session."
@@ -161,10 +195,10 @@ export default function OwnerSiteEditor({
         <label className={s.label}>
           About your business
           <textarea
-            required
+            required={!imported}
             className={s.textarea}
             maxLength={4000}
-            minLength={30}
+            minLength={imported ? undefined : 30}
             id="editor-description"
             value={draft.description || ""}
             onChange={(e) => update("description", e.target.value)}
@@ -177,7 +211,7 @@ export default function OwnerSiteEditor({
           <label className={s.label}>
             Business phone
             <input
-              required
+              required={!imported}
               type="tel"
               minLength={7}
               maxLength={30}
@@ -189,7 +223,7 @@ export default function OwnerSiteEditor({
           <label className={s.label}>
             Public contact email
             <input
-              required
+              required={!imported}
               type="email"
               className={s.input}
               id="editor-contact_email"
@@ -203,7 +237,7 @@ export default function OwnerSiteEditor({
             City
             <input
               className={s.input}
-              required
+              required={!imported}
               value={draft.city || ""}
               onChange={(e) => update("city", e.target.value)}
             />
@@ -212,7 +246,7 @@ export default function OwnerSiteEditor({
             State or region
             <input
               className={s.input}
-              required
+              required={!imported}
               value={draft.state || ""}
               onChange={(e) => update("state", e.target.value)}
             />
@@ -242,7 +276,7 @@ export default function OwnerSiteEditor({
           <label className={s.label}>
             Business address
             <input
-              required
+              required={!imported}
               className={s.input}
               value={draft.address || ""}
               onChange={(e) => update("address", e.target.value)}
@@ -302,7 +336,7 @@ export default function OwnerSiteEditor({
             <label className={s.label}>
               What’s included?
               <textarea
-                required
+                required={!imported}
                 className={s.textarea}
                 value={service.description || ""}
                 maxLength={1500}
@@ -316,7 +350,7 @@ export default function OwnerSiteEditor({
                 }
               />
             </label>
-            {draft.services.length > 1 && (
+            {draft.services.length > (imported ? 0 : 1) && (
               <button
                 type="button"
                 className={s.secondary}

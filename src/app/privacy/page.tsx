@@ -40,7 +40,7 @@ export default function Privacy() {
         <h2>Google connections</h2>
         <p>
           Public business lookup uses Google Maps listing information to help
-          you enter your details. This is separate from connecting an account.
+          build a preview with available photos, hours, and contact details. We save the listing ID and your own edits, and fetch listing content again when you reopen your website. Google Maps has its own <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>. This is separate from connecting an account.
           If you choose to connect Google Business Profile, we access the
           business accounts and locations you can manage, the selected profile’s
           business information, and available performance data. Profile changes

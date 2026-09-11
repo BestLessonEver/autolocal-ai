@@ -7,6 +7,7 @@ import { getBillingPlans } from '@/lib/billing-plans'
 import { checkAvailability, normalizeDomain } from '@/lib/vercel-domains'
 import { createOwnerCheckout } from '@/lib/checkout-session'
 import { isSiteTemplate } from '@/components/templates/types'
+import { assertStaticPublishingReady } from '@/lib/publishing-readiness'
 
 export async function POST(req: Request) {
   try {
@@ -14,6 +15,7 @@ export async function POST(req: Request) {
     const product = String(body.product || '')
     if (!['hosting', 'managed', 'change', 'rush', 'domain', 'hosting_and_domain'].includes(product)) throw new ApiError(400, 'Choose a valid service.')
     const { user, db, site } = await requireOwnerSite({ siteId: body.siteId, slug: body.slug })
+    assertStaticPublishingReady(site)
     const stripe = getStripe()
     const origin = appOrigin()
     const metadata: Record<string, string> = { product, siteId: site.id, owner_id: user.id, slug: site.slug }

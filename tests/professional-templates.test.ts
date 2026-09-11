@@ -11,6 +11,26 @@ import { SITE_TEMPLATES } from '../src/components/templates/types'
 
 const record = { ...TEMPLATE_DEMOS.summit, demo: false, slug: 'real-test-business', business_name: 'Example & Sons', tagline: 'Help for your home.', description: 'Repairs and maintenance in the local area.', hosting_status: 'active', deploy_status: 'live', phone: '(713) 555-0199', email: 'private-owner@example.test', contact_email: 'public@example.test', website_current: 'https://old-provider.example.test', custom_domain: null, domain_status: null, city: 'Houston', state: 'TX', address: '123 Example Street', faq: [], hero_image_url: null, image_caption: null }
 
+test('all designs show every available Google photo with adjacent safe attribution and actual hours', () => {
+  const photos = Array.from({ length: 10 }, (_, index) => ({ url: `https://lh3.googleusercontent.com/photo-${index}`, width: 1200, height: 800, attributions: [{ displayName: `Photographer ${index} <script>`, uri: index === 0 ? 'javascript:alert(1)' : 'https://maps.google.com/contributor' }] }))
+  const data = publicSiteData({ ...record, services: [], description: null, google_photos: photos, google_source_url: 'https://maps.google.com/business', google_attributions: [{ displayName: 'Listing provider', uri: 'https://example.test/provider' }], hours: { Monday: '2:00–8:00 PM', Sunday: 'Closed' } })
+  for (const { id } of SITE_TEMPLATES) {
+    const $ = load(generateStaticHtml(data, id, { mode: 'preview' }))
+    assert.equal($('img[src*="googleusercontent.com"]').length, 10, id)
+    assert.equal($('.al-photo-credit').length, 10, id)
+    for (let index = 0; index < 10; index++) assert.match($(`img[src$="photo-${index}"]`).closest('figure').find('figcaption').text(), new RegExp(`Photographer ${index}`))
+    assert.equal($('a[href^="javascript:"]').length, 0)
+    assert.match($('.al-source-credit').text(), /Google Maps.*Listing provider/)
+    assert.match($('.al-hours').text(), /Monday2:00–8:00 PMSundayClosed/)
+    assert.equal($('.al-service,.al-demo').length, 0)
+    assert.equal($('form').attr('data-mode'), 'preview')
+  }
+  const withUpload = load(renderProfessionalSite({ ...data, hero_image_url: 'https://example.test/owner.jpg', gallery_images: ['https://example.test/other.jpg'] }))
+  assert.equal(withUpload('.al-hero img').attr('src'), 'https://example.test/owner.jpg')
+  assert.equal(withUpload('img[src*="googleusercontent.com"]').length, 10)
+  assert.equal(withUpload('img[src="https://example.test/other.jpg"]').length, 1)
+})
+
 test('all supported designs use identical preview/export content and working anchor destinations', () => {
   for (const { id: family } of SITE_TEMPLATES) {
     const html = generateStaticHtml(record, family, { apiBaseUrl: 'https://app.example.test' })

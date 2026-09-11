@@ -522,6 +522,7 @@ function Content({ demo }: { demo: boolean }) {
                   <p>{subtitle}</p>
                 </div>
               </div>
+              {site.google_import_error && <p className={`${s.message} ${s.error}`} role="alert">{site.google_import_error}</p>}
               {notice && (
                 <p className={s.message} role="status">
                   {notice}
