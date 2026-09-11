@@ -1,9 +1,11 @@
 import {appOrigin} from '@/lib/integration-config'
 import {ownerSetupHealth,type ProviderHealthRow} from '@/lib/owner-setup-health'
 import {requireOwnerSite,selectorFromRequest,apiErrorResponse,ApiError} from '@/lib/owner-access'
+import {hydrateGoogleSite} from '@/lib/google-site'
 export async function GET(request:Request) {
   try {
-  const {site,db,user}=await requireOwnerSite(selectorFromRequest(request))
+  const {site:savedSite,db,user}=await requireOwnerSite(selectorFromRequest(request))
+  const site=await hydrateGoogleSite(savedSite,{request})
   const monthStart=new Date();monthStart.setUTCDate(1);monthStart.setUTCHours(0,0,0,0)
   const {count:changesThisMonth,error}=await db.from('change_requests').select('id',{count:'exact',head:true}).eq('preview_id',site.id).gte('created_at',monthStart.toISOString())
   if(error) throw new ApiError(503,'Your dashboard is temporarily unavailable.')
@@ -59,8 +61,12 @@ export async function GET(request:Request) {
     contact_email: site.contact_email || null,
     preview_id: site.id,
     gallery_images: site.gallery_images || [],
+    google_photos: site.google_photos || [],
+    google_source_url: site.google_source_url || null,
+    google_attributions: site.google_attributions || [],
+    google_import_error: site.google_import_error || null,
     hero_crop: site.hero_crop ?? 50,
     site_mode: site.site_mode || 'business',
-  })
+  },{headers:{'Cache-Control':'private, no-store'}})
   } catch(error) { return apiErrorResponse(error) }
 }

@@ -8,6 +8,7 @@ import { normalizeDomain, normalizeHostname, registerDomain, type Registrant } f
 import { generateStaticSiteFiles } from '@/lib/static-templates'
 import { publicSiteData } from '@/components/templates/public-site-data'
 import { isolatedProject, publishingNamespace, publishingTarget, verifyIsolatedDeployment } from '@/lib/providers/publishing-target'
+import { assertStaticPublishingReady, needsLiveGoogleContent, GOOGLE_IMPORT_PUBLISHING_MESSAGE } from '@/lib/publishing-readiness'
 
 async function saveSite(db: SupabaseClient, id: string, values: Record<string, unknown>) {
   const { error } = await db.from('website_previews').update(values).eq('id', id)
@@ -19,12 +20,14 @@ async function saveJobResult(db: SupabaseClient, job: IntegrationJob, result: Re
   job.result = result
 }
 export function publishingSnapshot(site: Record<string, unknown>) {
+  assertStaticPublishingReady(site)
   return { ...publicSiteData(site), website_current: null, hosting_status: 'active', deploy_status: '' }
 }
 export function siteRevision(site: Record<string, unknown>) {
   return createHash('sha256').update(JSON.stringify(publishingSnapshot(site))).digest('hex').slice(0, 24)
 }
 export async function queueDeployment(db: SupabaseClient, site: Record<string, unknown>, source = 'owner', approvedSite?: Record<string, unknown>) {
+  assertStaticPublishingReady(site)
   const target = publishingTarget(site)
   const snapshot = publishingSnapshot(approvedSite || site)
   if (snapshot.slug !== site.slug) throw new JobError('Approved content does not match this website', false, true)
@@ -75,6 +78,7 @@ export async function runDeployment(db: SupabaseClient, job: IntegrationJob) {
   if (error || !site) throw new JobError('Website not found', false)
   if (site.requested_deployment_job_id !== job.id) return { skipped: 'A newer publishing request superseded this job' }
   const suspended = job.kind === 'suspend_site'
+  if (!suspended && needsLiveGoogleContent(site)) throw new JobError(GOOGLE_IMPORT_PUBLISHING_MESSAGE, false, true)
   if (!suspended && !['active', 'pending_cancel'].includes(site.hosting_status)) throw new JobError('Hosting is not active', false)
   if (suspended && site.hosting_status !== 'cancelled') return { skipped: 'Hosting is active again' }
   const target = publishingTarget(site)
@@ -83,6 +87,7 @@ export async function runDeployment(db: SupabaseClient, job: IntegrationJob) {
   if ((job.payload.publishingScope || (target.scope && !suspended)) && job.payload.publishingScope !== target.scope) throw new JobError('This publishing job belongs to another environment. Queue a new staging publication.', false, true)
   const { domain, siteUrl, custom: useCustom } = target
   const approved = job.payload.site && typeof job.payload.site === 'object' ? job.payload.site as Record<string, unknown> : null
+  if (!suspended && approved && needsLiveGoogleContent(approved)) throw new JobError(GOOGLE_IMPORT_PUBLISHING_MESSAGE, false, true)
   if (!suspended && (!approved || approved.slug !== site.slug || siteRevision(approved) !== job.payload.revision)) throw new JobError('Approved website content is missing or changed. Publish again from the owner workspace.', false, true)
   let deploymentId = String(job.result?.deploymentId || '')
   let projectId = String(job.result?.projectId || site.vercel_project_id || '')

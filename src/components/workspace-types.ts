@@ -1,3 +1,5 @@
+import type { GoogleListingAttribution, GoogleListingPhoto } from '@/lib/google-listing-types';
+
 export type Site = {
   id: string;
   slug: string;
@@ -18,6 +20,10 @@ export type Site = {
   hours: Record<string, string> | null;
   hero_image_url: string | null;
   gallery_images: string[];
+  google_photos?: GoogleListingPhoto[];
+  google_source_url?: string | null;
+  google_attributions?: GoogleListingAttribution[];
+  google_import_error?: string;
   hosting_status: string;
   subscription_status?: string | null;
   has_billing?: boolean;

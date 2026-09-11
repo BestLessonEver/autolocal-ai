@@ -3,10 +3,12 @@ import type Stripe from 'stripe'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { ApiError } from '@/lib/owner-access'
 import { publishingSnapshot } from '@/lib/deployment-service'
+import { assertStaticPublishingReady } from '@/lib/publishing-readiness'
 
 type CheckoutSite = Record<string, unknown> & { id: string; checkout_request_key?: string | null; checkout_session_id?: string | null; checkout_event_id?: string | null }
 /** A durable site-level intent survives client retries and provider response loss. */
 export async function createOwnerCheckout(db: SupabaseClient, stripe: Stripe, site: CheckoutSite, params: Stripe.Checkout.SessionCreateParams) {
+  assertStaticPublishingReady(site)
   let key = site.checkout_request_key || null
   if (site.checkout_session_id) {
     const existing = await stripe.checkout.sessions.retrieve(site.checkout_session_id)

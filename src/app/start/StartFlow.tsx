@@ -1,897 +1,280 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import Link from "next/link";
-import {
-  ArrowLeft,
-  ArrowRight,
-  Check,
-  Globe2,
-  Plus,
-  Search,
-  Sparkles,
-  Trash2,
-} from "lucide-react";
-import MarketingNav from "@/components/MarketingNav";
-import MarketingFooter from "@/components/MarketingFooter";
-import { createClient } from "@/lib/supabase/client";
-import {
-  validateOnboardingStep,
-  parseBusinessHours,
-} from "@/lib/onboarding-validation";
-import {
-  savePendingDraft,
-  loadPendingDraft,
-  clearPendingDraft,
-} from "@/lib/pending-draft";
-import m from "@/components/marketing.module.css";
-import s from "./start.module.css";
-import { SITE_TEMPLATES, isSiteTemplate } from "@/components/templates/types";
-type Service = {
-  name: string;
-  description: string;
-  price: string;
-};
-type Draft = {
-  goal: "new" | "improve";
-  businessName: string;
-  city: string;
-  state: string;
-  address: string;
-  website: string;
-  phone: string;
-  contactEmail: string;
-  category: string;
-  description: string;
-  serviceAreas: string;
-  privateAddress: boolean;
-  services: Service[];
-  hours: string;
-  template: string;
-  confirmed: boolean;
-  question: string;
-  answer: string;
-  googlePlaceId: string;
-};
-type Place = {
-  placeId: string;
-  name: string;
-  address: string;
-  rating: number | null;
-  reviewCount: number;
-};
-const KEY = "autolocal.business-draft.v2";
-const initial: Draft = {
-  goal: "new",
-  businessName: "",
-  city: "",
-  state: "",
-  address: "",
-  website: "",
-  phone: "",
-  contactEmail: "",
-  category: "",
-  description: "",
-  serviceAreas: "",
-  privateAddress: true,
-  services: [{ name: "", description: "", price: "" }],
-  hours: "",
-  template: "summit",
-  confirmed: false,
-  question: "",
-  answer: "",
-  googlePlaceId: "",
-};
-const categories = [
-  "Home services",
-  "Beauty & wellness",
-  "Professional services",
-  "Health & fitness",
-  "Education",
-  "Food & hospitality",
-  "Retail",
-  "Automotive",
-  "Other",
-];
+
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
+import { ArrowLeft, ArrowRight, Check, LoaderCircle, Search, SlidersHorizontal } from 'lucide-react';
+import MarketingNav from '@/components/MarketingNav';
+import MarketingFooter from '@/components/MarketingFooter';
+import { createClient } from '@/lib/supabase/client';
+import { clearPendingDraft, loadPendingDraft, savePendingDraft } from '@/lib/pending-draft';
+import { isGoogleEditableDraftField, draftFromGoogleListing, previewFromInstantDraft, intakeFromInstantDraft, draftStorageSnapshot, applyGoogleDraftEdits, type InstantDraft } from '@/lib/instant-preview';
+import type { GoogleListingDetails } from '@/lib/google-listing-types';
+import { SITE_TEMPLATES, isSiteTemplate } from '@/components/templates/types';
+import { parseBusinessHours, validBusinessPhone } from '@/lib/onboarding-validation';
+import { generateStaticHtml } from '@/lib/static-templates';
+import ManualStartFlow from './ManualStartFlow';
+import m from '@/components/marketing.module.css';
+import s from './instant.module.css';
+
+const STORAGE_KEY = 'autolocal.instant-website.v1';
+type Place = { placeId: string; name: string; address: string };
+type SavedDraft = ReturnType<typeof draftStorageSnapshot>;
+
+function comparable(value: unknown): unknown {
+  if (typeof value === 'string') return value.trim();
+  if (Array.isArray(value)) return value.map(comparable);
+  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).sort(([left], [right]) => left.localeCompare(right)).map(([key, item]) => [key, comparable(item)]));
+  return value;
+}
+
+function sameDraftValue(field: keyof InstantDraft, left: unknown, right: unknown) {
+  if (field === 'hours' && typeof left === 'string' && typeof right === 'string') {
+    try { return JSON.stringify(comparable(parseBusinessHours(left))) === JSON.stringify(comparable(parseBusinessHours(right))); }
+    catch { /* Incomplete typing is still compared as text. */ }
+  }
+  return JSON.stringify(comparable(left)) === JSON.stringify(comparable(right));
+}
+
 export default function StartFlow() {
-  const params = useSearchParams(),
-    router = useRouter(),
-    formRef = useRef<HTMLFormElement>(null),
-    heading = useRef<HTMLHeadingElement>(null);
-  const [draft, setDraft] = useState<Draft>(initial);
-  const [ready, setReady] = useState(false);
-  const [step, setStep] = useState(0);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
+  const params = useSearchParams();
+  const router = useRouter();
+  const [businessName, setBusinessName] = useState(params.get('name') || '');
+  const [city, setCity] = useState(params.get('city') || '');
   const [results, setResults] = useState<Place[] | null>(null);
+  const [draft, setDraft] = useState<InstantDraft | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [selecting, setSelecting] = useState('');
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [editing, setEditing] = useState(false);
+  const [settingsExpanded, setSettingsExpanded] = useState(false);
   const [owner, setOwner] = useState<string | null>(null);
+  const [manualResume, setManualResume] = useState(false);
+  const scope = useRef(0);
+  const restoreToken = useRef(0);
+  const lookup = useRef<AbortController | null>(null);
+  const searchRequest = useRef<AbortController | null>(null);
+  const saveRequest = useRef<AbortController | null>(null);
+  const listingBaseline = useRef<InstantDraft | null>(null);
+  const saving = useRef(false);
+  const pendingResume = useRef(false);
+  const manual = params.get('manual') === '1' || manualResume;
+  const queryKey = params.toString();
+
   useEffect(() => {
-    // Hydrate browser-only draft storage after the initial server-matched frame.
-    const frame = requestAnimationFrame(() => {
-      const requestedTemplate = params.get("template");
-      const selectedTemplate = isSiteTemplate(requestedTemplate) ? requestedTemplate : null;
-      try {
-        const pending = params.get("draft");
-        const saved = pending
-          ? loadPendingDraft(localStorage, pending)
-          : JSON.parse(sessionStorage.getItem(KEY) || "null");
-        if (pending && !saved)
-          setNotice(
-            "This draft link expired or is unavailable in this browser. Return to your original setup tab, or start again here.",
-          );
-        if (
-          saved &&
-          typeof saved.businessName === "string" &&
-          Array.isArray(saved.services)
-        ) {
-          setDraft({
-            ...initial,
-            ...saved,
-            template: selectedTemplate || (isSiteTemplate(saved.template) ? saved.template : "summit"),
-            confirmed: false,
-          });
-          setStep(
-            Number.isInteger(saved._step)
-              ? Math.min(3, Math.max(0, saved._step))
-              : 0,
-          );
-        } else
-          setDraft((d) => ({
-            ...d,
-            businessName: params.get("name") || "",
-            city: params.get("city") || "",
-            contactEmail: params.get("email") || "",
-            template: selectedTemplate || "summit",
-          }));
-      } catch {
-        // A design selected from the gallery still applies if storage is unavailable.
-        if (selectedTemplate) setDraft(d => ({ ...d, template: selectedTemplate }));
-      }
-      setReady(true);
-      try {
-        createClient()
-          .auth.getUser()
-          .then(({ data }) => setOwner(data.user?.email || null))
-          .catch(() => {});
-      } catch {
-        /* Manual preview setup remains available while auth is configured. */
-      }
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [params]);
-  useEffect(() => {
-    if (ready)
-      try {
-        sessionStorage.setItem(KEY, JSON.stringify({ ...draft, _step: step }));
-      } catch {
-        /* Browser storage may be disabled. */
-      }
-  }, [draft, ready, step]);
-  const update = <K extends keyof Draft>(key: K, value: Draft[K]) =>
-    setDraft((d) => ({
-      ...d,
-      [key]: value,
-      confirmed: key === "confirmed" ? Boolean(value) : false,
-    }));
-  const go = (value: number) => {
-    setError("");
-    setNotice("");
-    setStep(value);
-    requestAnimationFrame(() => {
-      heading.current?.focus();
-      heading.current?.scrollIntoView({ block: "start", behavior: "smooth" });
-    });
-  };
-  async function search() {
-    if (!draft.businessName.trim()) {
-      setError("Enter your business name first.");
-      return;
-    }
-    setBusy(true);
-    setError("");
-    setResults(null);
+    const activeScope = ++scope.current;
+    const activeRestore = ++restoreToken.current;
+    const active = () => scope.current === activeScope;
+    // Restore browser-owned draft state after hydration.
+    const restore = async () => {
+    await Promise.resolve();
+    if (!active() || params.get('manual') === '1') return;
+    let saved: SavedDraft | null = null;
     try {
-      const res = await fetch("/api/search-business", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          businessName: draft.businessName,
-          city: draft.city,
-          state: draft.state,
-        }),
+      const pending = params.get('draft');
+      const value = pending ? loadPendingDraft(localStorage, pending) : JSON.parse(sessionStorage.getItem(STORAGE_KEY) || 'null');
+      if (pending && value && !(value as InstantDraft).importedFromGoogle) {
+        setManualResume(true);
+        return;
+      }
+      if (value && typeof value === 'object' && (value as InstantDraft).importedFromGoogle && typeof (value as InstantDraft).googlePlaceId === 'string') saved = value as SavedDraft;
+      else if (pending) setNotice('Your saved setup is unavailable in this browser. Find your business again to continue.');
+    } catch { /* Finding a business still works when browser storage is unavailable. */ }
+    const getOwner = async () => {
+      try { const { data } = await createClient().auth.getUser(); if (active()) setOwner(data.user?.email || null); return Boolean(data.user); }
+      catch { return false; }
+    };
+    if (saved) {
+      const resume = saved;
+      setBusinessName(resume.ownerLabel || '');
+      pendingResume.current = Boolean(params.get('draft'));
+      void Promise.all([getOwner(), loadListing(resume.googlePlaceId, resume.ownerLabel || 'Your business', resume, true)]).then(([signedIn, restored]) => {
+        if (active() && restoreToken.current === activeRestore && signedIn && restored && pendingResume.current) {
+          pendingResume.current = false;
+          void saveWebsite(restored);
+        }
       });
-      const data = await res.json();
-      if (!res.ok) throw Error(data.error || "Business search is unavailable.");
+    } else void getOwner();
+    };
+    void restore();
+    return () => {
+      scope.current = activeScope + 1;
+      restoreToken.current = activeRestore + 1;
+      pendingResume.current = false;
+      lookup.current?.abort();
+      searchRequest.current?.abort();
+      saveRequest.current?.abort();
+      saving.current = false;
+    };
+    // URL changes initialize a new setup; user edits must not re-run the lookup.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queryKey]);
+
+  useEffect(() => {
+    if (!draft) return;
+    try { sessionStorage.setItem(STORAGE_KEY, JSON.stringify(draftStorageSnapshot(draft))); }
+    catch { /* The live preview remains available without storage. */ }
+  }, [draft]);
+
+  const html = useMemo(() => draft ? generateStaticHtml(previewFromInstantDraft(draft), draft.template, { mode: 'preview' }) : '', [draft]);
+
+  async function search(event: React.FormEvent) {
+    event.preventDefault();
+    if (!businessName.trim()) { setError('Enter your business name.'); return; }
+    pendingResume.current = false; restoreToken.current++;
+    searchRequest.current?.abort();
+    const controller = new AbortController();
+    searchRequest.current = controller;
+    const activeScope = scope.current;
+    const active = () => scope.current === activeScope && searchRequest.current === controller && !controller.signal.aborted;
+    setBusy(true); setError(''); setNotice(''); setResults(null);
+    try {
+      const response = await fetch('/api/search-business', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ businessName: businessName.trim(), city: city.trim() }), signal: controller.signal });
+      const data = await response.json();
+      if (!active()) return;
+      if (!response.ok) throw Error(data.error || 'Business search is unavailable.');
       setResults(data.results || []);
-      if (!data.results?.length)
-        setNotice(
-          "No matching listing found. You can enter your business details yourself.",
-        );
-    } catch (e) {
-      setError(
-        `${e instanceof Error ? e.message : "Search is unavailable."} You can continue manually.`,
-      );
-    } finally {
-      setBusy(false);
-    }
+      if (!data.results?.length) setNotice('No matching business found. Try a nearby city or enter your details yourself.');
+    } catch (e) { if (active()) setError(e instanceof Error ? e.message : 'Business search is unavailable. Please try again.'); }
+    finally { if (active()) setBusy(false); }
   }
-  async function select(place: Place) {
-    setBusy(true);
-    setError("");
-    setDraft((d) => ({
-      ...d,
-      businessName: place.name,
-      address: place.address,
-      googlePlaceId: place.placeId,
-      confirmed: false,
-    }));
+
+  async function loadListing(placeId: string, name: string, saved?: SavedDraft, restoring = false): Promise<InstantDraft | null> {
+    if (!restoring) { pendingResume.current = false; restoreToken.current++; }
+    lookup.current?.abort();
+    const controller = new AbortController();
+    lookup.current = controller;
+    const activeScope = scope.current;
+    const active = () => scope.current === activeScope && lookup.current === controller && !controller.signal.aborted;
+    setSelecting(name); setBusy(true); setError(''); setNotice('');
     try {
-      const res = await fetch("/api/business-details", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ placeId: place.placeId }),
-      });
-      const data = await res.json();
-      if (res.ok)
-        setDraft((d) => ({
-          ...d,
-          phone: data.phone || d.phone,
-          website: data.website || d.website,
-          city: data.city || d.city,
-          state: data.state || d.state,
-          hours: data.hours?.join("\n") || d.hours,
-          privateAddress: data.serviceAreaBusiness ?? d.privateAddress,
-        }));
-      else
-        setNotice(
-          "The listing was found, but some details could not load. Please fill in what’s missing.",
-        );
-    } catch {
-      setNotice("Please confirm the details below.");
-    } finally {
-      setBusy(false);
-      setStep(1);
-    }
+      const response = await fetch('/api/business-details', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ placeId }), signal: controller.signal });
+      const data: GoogleListingDetails & { error?: string } = await response.json();
+      if (!active()) return null;
+      if (!response.ok || data.placeId !== placeId || !data.name) throw Error(data.error || 'The business details could not load. Try again or enter your details yourself.');
+      const selected = params.get('template');
+      const next = applyGoogleDraftEdits(draftFromGoogleListing(data, isSiteTemplate(selected) ? selected : saved?.template, saved?.ownerLabel || businessName.trim() || name), saved?.googleEdits);
+      listingBaseline.current = next;
+      setDraft(next); setEditing(false); setSettingsExpanded(false);
+      if (data.photosUnavailable) setNotice(`${data.photosUnavailable} photo${data.photosUnavailable === 1 ? '' : 's'} could not load. You can refresh them without starting over.`);
+      if (data.businessStatus === 'CLOSED_PERMANENTLY') setNotice('Google marks this business permanently closed. Check that you chose the right listing.');
+      return next;
+    } catch (e) {
+      if (active()) setError(e instanceof Error ? e.message : 'Your business details could not load. Please try again.');
+      return null;
+    } finally { if (active()) { setBusy(false); setSelecting(''); } }
   }
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    const problem = validateOnboardingStep(draft, step);
-    if (problem) {
-      if (problem.step !== step) go(problem.step);
-      setError(problem.message);
-      return;
-    }
-    if (step < 3) {
-      go(step + 1);
-      return;
-    }
-    if (!draft.confirmed) {
-      setError("Confirm the business details before continuing.");
-      return;
-    }
-    if (draft.goal === "improve" && draft.website) {
+
+  function update<K extends keyof InstantDraft>(field: K, value: InstantDraft[K]) {
+    pendingResume.current = false; restoreToken.current++;
+    setDraft(current => {
+      if (!current) return current;
+      const googleEdits = { ...current.googleEdits };
+      if (isGoogleEditableDraftField(field)) {
+        const baseline = listingBaseline.current;
+        if (baseline && sameDraftValue(field, value, baseline[field])) {
+          if (Object.hasOwn(baseline.googleEdits, field)) Object.assign(googleEdits, { [field]: baseline.googleEdits[field] });
+          else delete googleEdits[field];
+        } else Object.assign(googleEdits, { [field]: value });
+      }
+      return { ...current, [field]: value, confirmed: false, googleEdits };
+    });
+  }
+
+  async function saveWebsite(current: InstantDraft) {
+    if (saving.current) return;
+    saving.current = true; pendingResume.current = false; restoreToken.current++;
+    const activeScope = scope.current;
+    const controller = new AbortController();
+    saveRequest.current = controller;
+    const active = () => scope.current === activeScope && saveRequest.current === controller && !controller.signal.aborted;
+    setBusy(true); setError('');
+    try {
+      if (!current.businessName.trim()) throw Error('Enter your business name before saving.');
+      if (Object.hasOwn(current.googleEdits, 'phone') && current.phone.trim() && !validBusinessPhone(current.phone.trim())) throw Error('Enter a valid business phone number with 7 to 15 digits, or leave it blank.');
+      if (Object.hasOwn(current.googleEdits, 'contactEmail') && current.contactEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(current.contactEmail.trim())) throw Error('Enter a valid public contact email, or leave it blank.');
+      const payload = intakeFromInstantDraft({ ...current, confirmed: true });
+      const { data: { user } } = await createClient().auth.getUser();
+      if (!active()) return;
+      if (!user) {
+        const pending = params.get('draft') || '';
+        const id = /^[0-9a-f-]{36}$/i.test(pending) ? pending : crypto.randomUUID();
+        savePendingDraft(localStorage, id, draftStorageSnapshot(current));
+        router.push(`/login?next=${encodeURIComponent('/start?draft=' + id)}&reason=save-preview`);
+        return;
+      }
+      const response = await fetch('/api/intake/submit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), signal: controller.signal });
+      const result = await response.json();
+      if (!active()) return;
+      if (!response.ok || !result.success) throw Error(result.error || 'Your website could not be saved.');
       try {
-        const url = new URL(draft.website);
-        if (!["http:", "https:"].includes(url.protocol)) throw Error();
-      } catch {
-        setError("Enter a full website address starting with https://.");
-        go(0);
-        return;
-      }
-    }
-    setBusy(true);
-    setError("");
-    try {
-      const {
-        data: { user },
-        error: authError,
-      } = await createClient().auth.getUser();
-      if (authError || !user) {
-        const draftId = crypto.randomUUID();
-        savePendingDraft(localStorage, draftId, { ...draft, _step: 3 });
-        router.push(
-          `/login?next=${encodeURIComponent("/start?draft=" + draftId)}&reason=save-preview`,
-        );
-        return;
-      }
-      const hours = parseBusinessHours(draft.hours);
-      const res = await fetch("/api/intake/submit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          businessName: draft.businessName.trim(),
-          category: draft.category,
-          city: draft.city.trim(),
-          state: draft.state.trim(),
-          address: draft.privateAddress ? "" : draft.address.trim(),
-          show_address: !draft.privateAddress,
-          website: draft.website,
-          phone: draft.phone,
-          contactEmail: draft.contactEmail,
-          description: draft.description,
-          services: draft.services.filter((x) => x.name.trim()),
-          hours,
-          template: draft.template,
-          serviceAreas: draft.serviceAreas
-            .split(",")
-            .map((x) => x.trim())
-            .filter(Boolean),
-          faq:
-            draft.question.trim() && draft.answer.trim()
-              ? [
-                  {
-                    question: draft.question.trim(),
-                    answer: draft.answer.trim(),
-                  },
-                ]
-              : [],
-          googlePlaceId: draft.googlePlaceId || undefined,
-          businessFacts: {
-            verified: true,
-            serviceAreaBusiness: draft.privateAddress,
-            existingWebsite: draft.website || null,
-            goal: draft.goal,
-          },
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok)
-        throw Error(data.error || "Your preview could not be saved.");
-      sessionStorage.removeItem(KEY);
-      if (params.get("draft"))
-        clearPendingDraft(localStorage, params.get("draft")!);
-      router.push(
-        data.previewUrl || `/preview/${encodeURIComponent(data.slug)}`,
-      );
-    } catch (e) {
-      setError(
-        e instanceof Error
-          ? e.message
-          : "Your preview could not be saved. Please try again.",
-      );
-    } finally {
-      setBusy(false);
-    }
+        sessionStorage.removeItem(STORAGE_KEY);
+        if (params.get('draft')) clearPendingDraft(localStorage, params.get('draft')!);
+      } catch { /* The saved website is available in the account. */ }
+      router.push(result.previewUrl || `/preview/${encodeURIComponent(result.slug)}`);
+    } catch (e) { if (active()) { setError(e instanceof Error ? e.message : 'Your website could not be saved. Please try again.'); setEditing(true); setSettingsExpanded(true); } }
+    finally { if (saveRequest.current === controller) saving.current = false; if (active()) setBusy(false); }
   }
-  return (
-    <div className={m.surface}>
-      <MarketingNav />
-      <main className={s.shell}>
-        <aside className={s.rail}>
-          <h1>
-            Your business.
-            <br />A better next chapter.
-          </h1>
-          <p>Bring the facts. We’ll help you put them to work.</p>
-          <ol className={s.progress}>
-            {[
-              "Your business",
-              "The essentials",
-              "Your services",
-              "Your design",
-            ].map((label, i) => (
-              <li
-                key={label}
-                className={step === i ? s.active : ""}
-                aria-current={step === i ? "step" : undefined}
-              >
-                <span>{i < step ? <Check size={13} /> : i + 1}</span>
-                {label}
-              </li>
-            ))}
-          </ol>
-          <p className={s.saved}>
-            Your draft stays in this browser tab until you save it. Nothing is
-            published during setup.
-          </p>
-        </aside>
-        <div className={s.panel}>
-          <form ref={formRef} onSubmit={submit}>
-            {step === 0 && (
-              <>
-                <p className={m.eyebrow}>Step 1 of 4</p>
-                <h2 ref={heading} tabIndex={-1}>
-                  Let’s meet your business.
-                </h2>
-                <p className={s.intro}>
-                  Whether you’re starting from nothing or ready for something
-                  better, this is the place.
-                </p>
-                <div className={s.choices}>
-                  <button
-                    type="button"
-                    className={s.choice}
-                    aria-pressed={draft.goal === "new"}
-                    onClick={() => update("goal", "new")}
-                  >
-                    <Sparkles size={21} />
-                    <strong>I need a website</strong>
-                    <small>Give my business a place online.</small>
-                  </button>
-                  <button
-                    type="button"
-                    className={s.choice}
-                    aria-pressed={draft.goal === "improve"}
-                    onClick={() => update("goal", "improve")}
-                  >
-                    <Globe2 size={21} />
-                    <strong>Mine needs work</strong>
-                    <small>Build a better first impression.</small>
-                  </button>
-                </div>
-                <div className={s.fields}>
-                  <label className={m.field}>
-                    Business name
-                    <input
-                      required
-                      maxLength={120}
-                      autoComplete="organization"
-                      value={draft.businessName}
-                      onChange={(e) => update("businessName", e.target.value)}
-                      placeholder="Your business name"
-                    />
-                  </label>
-                  <div className={s.row}>
-                    <label className={m.field}>
-                      City
-                      <input
-                        required
-                        maxLength={100}
-                        autoComplete="address-level2"
-                        value={draft.city}
-                        onChange={(e) => update("city", e.target.value)}
-                        placeholder="Friendswood"
-                      />
-                    </label>
-                    <label className={m.field}>
-                      State or region
-                      <input
-                        required
-                        maxLength={80}
-                        autoComplete="address-level1"
-                        value={draft.state}
-                        onChange={(e) => update("state", e.target.value)}
-                        placeholder="Texas"
-                      />
-                    </label>
-                  </div>
-                  {draft.goal === "improve" && (
-                    <label className={m.field}>
-                      Current website
-                      <input
-                        required
-                        type="url"
-                        maxLength={500}
-                        value={draft.website}
-                        placeholder="https://yourbusiness.com"
-                        onChange={(e) => update("website", e.target.value)}
-                      />
-                      <small>Your current website stays unchanged.</small>
-                    </label>
-                  )}
-                  <button
-                    type="button"
-                    className={m.buttonOutline}
-                    disabled={busy}
-                    onClick={search}
-                  >
-                    <Search size={17} />
-                    {busy
-                      ? "Looking for your business…"
-                      : "Find my Google listing"}
-                  </button>
-                </div>
-                {results && results.length > 0 && (
-                  <div className={s.results}>
-                    {results.map((place) => (
-                      <button
-                        type="button"
-                        key={place.placeId}
-                        disabled={busy}
-                        onClick={() => select(place)}
-                      >
-                        <div>
-                          <strong>{place.name}</strong>
-                          <span>{place.address}</span>
-                        </div>
-                        <ArrowRight size={17} />
-                      </button>
-                    ))}
-                  </div>
-                )}
-                <p className={s.hint}>
-                  Listing information from Google Maps. Selecting a result does
-                  not connect or claim your Google Business Profile. You can
-                  also continue with your own details.
-                </p>
-              </>
-            )}
-            {step === 1 && (
-              <>
-                <p className={m.eyebrow}>Step 2 of 4</p>
-                <h2 ref={heading} tabIndex={-1}>
-                  Make it easy to reach you.
-                </h2>
-                <p className={s.intro}>
-                  These are the details customers will see. Check anything we
-                  found before moving on.
-                </p>
-                <div className={s.fields}>
-                  <label className={m.field}>
-                    Business category
-                    <select
-                      required
-                      value={draft.category}
-                      onChange={(e) => update("category", e.target.value)}
-                    >
-                      <option value="">Choose a category</option>
-                      {categories.map((x) => (
-                        <option key={x}>{x}</option>
-                      ))}
-                    </select>
-                  </label>
-                  <div className={s.row}>
-                    <label className={m.field}>
-                      Business phone
-                      <input
-                        required
-                        type="tel"
-                        minLength={7}
-                        maxLength={30}
-                        title="Enter a valid phone number with at least seven characters."
-                        autoComplete="tel"
-                        value={draft.phone}
-                        onChange={(e) => update("phone", e.target.value)}
-                        placeholder="(555) 555-0100"
-                      />
-                    </label>
-                    <label className={m.field}>
-                      Customer contact email
-                      <input
-                        required
-                        type="email"
-                        autoComplete="email"
-                        maxLength={254}
-                        value={draft.contactEmail}
-                        onChange={(e) => update("contactEmail", e.target.value)}
-                        placeholder="hello@yourbusiness.com"
-                      />
-                    </label>
-                  </div>
-                  <label className={m.field}>
-                    Areas you serve
-                    <input
-                      required
-                      maxLength={400}
-                      value={draft.serviceAreas}
-                      onChange={(e) => update("serviceAreas", e.target.value)}
-                      placeholder="Friendswood, Pearland, Clear Lake"
-                    />
-                    <small>
-                      List real areas you serve, separated by commas.
-                    </small>
-                  </label>
-                  <label className={s.check}>
-                    <input
-                      type="checkbox"
-                      checked={draft.privateAddress}
-                      onChange={(e) =>
-                        update("privateAddress", e.target.checked)
-                      }
-                    />
-                    Customers do not visit my address. Show my service area
-                    instead.
-                  </label>
-                  {!draft.privateAddress && (
-                    <label className={m.field}>
-                      Public business address
-                      <input
-                        required
-                        autoComplete="street-address"
-                        maxLength={300}
-                        value={draft.address}
-                        onChange={(e) => update("address", e.target.value)}
-                      />
-                    </label>
-                  )}
-                  <label className={m.field}>
-                    What should customers know about you?
-                    <textarea
-                      required
-                      minLength={30}
-                      maxLength={2500}
-                      value={draft.description}
-                      onChange={(e) => update("description", e.target.value)}
-                      placeholder="Describe what you do, who you help, and what makes your approach different."
-                    />
-                    <small>
-                      Use facts you can stand behind. Include credentials only
-                      if you hold them.
-                    </small>
-                  </label>
-                  <label className={m.field}>
-                    Business hours{" "}
-                    <small>
-                      Optional — leave blank if customers should contact you.
-                    </small>
-                    <textarea
-                      maxLength={600}
-                      value={draft.hours}
-                      onChange={(e) => update("hours", e.target.value)}
-                      placeholder={
-                        "Monday: 9:00 AM – 5:00 PM\nTuesday: By appointment"
-                      }
-                    />
-                  </label>
-                </div>
-              </>
-            )}
-            {step === 2 && (
-              <>
-                <p className={m.eyebrow}>Step 3 of 4</p>
-                <h2 ref={heading} tabIndex={-1}>
-                  What can people hire you for?
-                </h2>
-                <p className={s.intro}>
-                  Clear services help customers choose you and help search
-                  engines understand what you offer.
-                </p>
-                {draft.services.map((service, i) => (
-                  <div className={s.service} key={i}>
-                    <div className={s.serviceHeading}>
-                      Service {i + 1}
-                      {i > 0 && (
-                        <button
-                          type="button"
-                          className={s.remove}
-                          aria-label={`Remove service ${i + 1}`}
-                          onClick={() =>
-                            update(
-                              "services",
-                              draft.services.filter((_, j) => j !== i),
-                            )
-                          }
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      )}
-                    </div>
-                    <label className={m.field}>
-                      Service name
-                      <input
-                        required
-                        maxLength={120}
-                        value={service.name}
-                        onChange={(e) =>
-                          update(
-                            "services",
-                            draft.services.map((x, j) =>
-                              j === i ? { ...x, name: e.target.value } : x,
-                            ),
-                          )
-                        }
-                        placeholder="For example: Interior painting"
-                      />
-                    </label>
-                    <label className={m.field}>
-                      What’s included?
-                      <textarea
-                        required
-                        minLength={15}
-                        maxLength={700}
-                        value={service.description}
-                        onChange={(e) =>
-                          update(
-                            "services",
-                            draft.services.map((x, j) =>
-                              j === i
-                                ? { ...x, description: e.target.value }
-                                : x,
-                            ),
-                          )
-                        }
-                        placeholder="Explain what the customer gets and when this service is useful."
-                      />
-                    </label>
-                    <label className={m.field}>
-                      Price or pricing note{" "}
-                      <small>Optional. Leave blank to invite an inquiry.</small>
-                      <input
-                        maxLength={100}
-                        value={service.price}
-                        onChange={(e) =>
-                          update(
-                            "services",
-                            draft.services.map((x, j) =>
-                              j === i ? { ...x, price: e.target.value } : x,
-                            ),
-                          )
-                        }
-                        placeholder="For example: Quoted after a visit"
-                      />
-                    </label>
-                  </div>
-                ))}
-                {draft.services.length < 8 && (
-                  <button
-                    type="button"
-                    className={s.add}
-                    onClick={() =>
-                      update("services", [
-                        ...draft.services,
-                        { name: "", description: "", price: "" },
-                      ])
-                    }
-                  >
-                    <Plus size={16} />
-                    Add another service
-                  </button>
-                )}
-                <h3 className={s.sectionLabel}>Answer a common question</h3>
-                <p className={s.hint}>
-                  Optional. A useful answer saves your customers time and gives
-                  search engines real context.
-                </p>
-                <div className={s.fields}>
-                  <label className={m.field}>
-                    Question
-                    <input
-                      maxLength={180}
-                      value={draft.question}
-                      onChange={(e) => update("question", e.target.value)}
-                      placeholder="For example: How do I get an estimate?"
-                    />
-                  </label>
-                  <label className={m.field}>
-                    Your answer
-                    <textarea
-                      required={Boolean(draft.question.trim())}
-                      maxLength={1000}
-                      value={draft.answer}
-                      onChange={(e) => update("answer", e.target.value)}
-                    />
-                  </label>
-                </div>
-              </>
-            )}
-            {step === 3 && (
-              <>
-                <p className={m.eyebrow}>Step 4 of 4</p>
-                <h2 ref={heading} tabIndex={-1}>
-                  Give your business its look.
-                </h2>
-                <p className={s.intro}>
-                  Choose your starting point. You can change the design and add
-                  your photos in your workspace.
-                </p>
-                <div className={s.designs}>
-                  {SITE_TEMPLATES.map(({id, name, audience: label}) => (
-                    <button
-                      type="button"
-                      key={id}
-                      className={s.design}
-                      aria-pressed={draft.template === id}
-                      aria-label={`Choose ${name}: ${label}`}
-                      onClick={() => update("template", id)}
-                    >
-                      <div className={s.designPreview}>
-                        <iframe
-                          src={`/templates/${id}?embed=1`}
-                          title={`${name} design example`}
-                          tabIndex={-1}
-                          aria-hidden="true"
-                          inert
-                        />
-                      </div>
-                      <strong>{name}</strong>
-                      <span>{label}</span>
-                    </button>
-                  ))}
-                </div>
-                <h3 className={s.sectionLabel}>
-                  One last look at the essentials.
-                </h3>
-                <dl className={s.review}>
-                  <div>
-                    <dt>Business</dt>
-                    <dd>{draft.businessName}</dd>
-                  </div>
-                  <div>
-                    <dt>Location</dt>
-                    <dd>
-                      {draft.city}, {draft.state}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Contact</dt>
-                    <dd>
-                      {draft.phone}
-                      <br />
-                      {draft.contactEmail}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Services</dt>
-                    <dd>
-                      {draft.services
-                        .map((x) => x.name)
-                        .filter(Boolean)
-                        .join(", ")}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Service areas</dt>
-                    <dd>{draft.serviceAreas}</dd>
-                  </div>
-                  <div>
-                    <dt>Street address</dt>
-                    <dd>
-                      {draft.privateAddress
-                        ? "Hidden from your website"
-                        : draft.address}
-                    </dd>
-                  </div>
-                </dl>
-                <label className={s.check}>
-                  <input
-                    required
-                    type="checkbox"
-                    checked={draft.confirmed}
-                    onChange={(e) => update("confirmed", e.target.checked)}
-                  />
-                  I’m authorized to manage this business and have checked these
-                  details. I understand this creates a draft, not a published
-                  website.
-                </label>
-                <p className={s.hint}>
-                  {owner
-                    ? `Saving to ${owner}.`
-                    : "Next, verify your email to save and manage your preview. Your draft will be available in this browser for 30 minutes while you verify your email."}{" "}
-                  By continuing you agree to our{" "}
-                  <Link href="/terms">terms</Link> and{" "}
-                  <Link href="/privacy">privacy policy</Link>.
-                </p>
-              </>
-            )}
-            {error && (
-              <p className={`${m.error} ${s.status}`} role="alert">
-                {error}
-              </p>
-            )}
-            {notice && (
-              <p className={`${m.success} ${s.status}`} role="status">
-                {notice}
-              </p>
-            )}
-            <div className={s.actions}>
-              {step > 0 ? (
-                <button
-                  type="button"
-                  onClick={() => go(step - 1)}
-                  className={s.back}
-                >
-                  <ArrowLeft size={16} />
-                  Back
-                </button>
-              ) : (
-                <span />
-              )}
-              <button type="submit" disabled={busy} className={m.button}>
-                {busy
-                  ? "Working…"
-                  : step === 3
-                    ? owner
-                      ? "Save my preview"
-                      : "Verify email & save"
-                    : "Continue"}
-                <ArrowRight size={17} />
-              </button>
-            </div>
-          </form>
+
+  function chooseAnother() {
+    if (saving.current) return;
+    pendingResume.current = false; restoreToken.current++;
+    lookup.current?.abort(); searchRequest.current?.abort(); listingBaseline.current = null;
+    setDraft(null); setSelecting(''); setBusy(false); setError(''); setNotice(''); setEditing(false); setSettingsExpanded(false);
+    try { sessionStorage.removeItem(STORAGE_KEY); } catch {}
+    if (params.get('draft')) router.replace('/start');
+  }
+
+  if (manual) return <ManualStartFlow />;
+
+  if (draft) return <div className={s.previewPage}>
+    <header className={s.previewHeader}>
+      <button type="button" className={s.back} disabled={busy} onClick={chooseAnother}><ArrowLeft size={16} />Different business</button>
+      <strong>{draft.businessName}</strong>
+      <button type="button" className={s.primary} disabled={busy} onClick={() => void saveWebsite(draft)}>{busy ? selecting ? 'Refreshing…' : 'Saving…' : 'Save my website'}<ArrowRight size={17} /></button>
+    </header>
+    <div className={s.previewLayout}>
+      <aside className={s.controls} aria-label="Your website settings" data-expanded={settingsExpanded}>
+        <p className={s.eyebrow}>Built from your listing</p><h1>Your website is ready.</h1>
+        <div className={s.imported}><span><Check size={16}/>{draft.googlePhotos.length} photos</span><span><Check size={16}/>{draft.hours ? 'Opening hours' : 'Contact details'}</span></div>
+        <button type="button" className={`${s.secondary} ${s.settingsToggle}`} disabled={busy} onClick={() => setSettingsExpanded(!settingsExpanded)} aria-expanded={settingsExpanded} aria-controls="website-settings"><SlidersHorizontal size={17}/>{settingsExpanded ? 'Hide settings' : 'Design & details'}</button>
+        <div id="website-settings" className={s.settingsBody}>
+        <label className={s.field}>Website design<select value={draft.template} disabled={busy} onChange={event => { if (isSiteTemplate(event.target.value)) update('template', event.target.value); }}>{SITE_TEMPLATES.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+        <button type="button" className={s.secondary} disabled={busy} onClick={() => setEditing(!editing)} aria-expanded={editing} aria-controls="business-detail-editor"><SlidersHorizontal size={17}/>{editing ? 'Hide details' : 'Edit business details'}</button>
+        {editing && <div id="business-detail-editor" className={s.editor}>
+          <label className={s.field}>Business name<input value={draft.businessName} disabled={busy} maxLength={200} onChange={e => update('businessName', e.target.value)}/></label>
+          <label className={s.field}>Business category<input value={draft.category} disabled={busy} maxLength={100} onChange={e => update('category', e.target.value)}/></label>
+          <label className={s.field}>About your business<textarea value={draft.description} disabled={busy} maxLength={4000} rows={4} onChange={e => update('description', e.target.value)}/></label>
+          <label className={s.field}>Business phone<input type="tel" value={draft.phone} disabled={busy} maxLength={50} onChange={e => update('phone', e.target.value)}/></label>
+          <label className={s.field}>Public contact email<input type="email" value={draft.contactEmail} disabled={busy} maxLength={254} onChange={e => update('contactEmail', e.target.value)}/><small>Optional. Use the address customers should see.</small></label>
+          <label className={s.check}><input type="checkbox" checked={!draft.privateAddress} disabled={busy} onChange={e => update('privateAddress', !e.target.checked)}/>Customers can visit this address</label>
+          {!draft.privateAddress && <label className={s.field}>Address<input value={draft.address} disabled={busy} maxLength={250} onChange={e => update('address', e.target.value)}/></label>}
+          <label className={s.field}>City<input value={draft.city} disabled={busy} maxLength={100} onChange={e => update('city', e.target.value)}/></label>
+          <label className={s.field}>State or region<input value={draft.state} disabled={busy} maxLength={100} onChange={e => update('state', e.target.value)}/></label>
+          <label className={s.field}>Opening hours<textarea value={draft.hours} disabled={busy} rows={7} onChange={e => update('hours', e.target.value)}/><small>One day per line. Leave unknown hours blank.</small></label>
+        </div>}
+        {draft.photosUnavailable > 0 && <button type="button" className={s.secondary} disabled={busy} onClick={() => void loadListing(draft.googlePlaceId, draft.businessName, draftStorageSnapshot(draft))}>Refresh photos</button>}
+        {!draft.hours && <p className={s.subtle}>Google hasn’t supplied opening hours. Add them whenever you’re ready.</p>}
+        {!draft.googlePhotos.length && <p className={s.subtle}>No photos were available from Google. You can add your own after saving.</p>}
         </div>
-      </main>
-      <MarketingFooter />
+        {error && <p className={s.error} role="alert">{error}</p>}{notice && <p className={s.notice} role="status">{notice}</p>}
+        <p className={s.saveNote}>{owner ? `Save privately to ${owner}.` : 'Sign in to save privately.'} Saving confirms you manage this business and agree to our <Link href="/terms">terms</Link>.</p>
+      </aside>
+      <main className={s.website} aria-label="Your populated website"><iframe title={`${draft.businessName} website`} srcDoc={html} sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox" /></main>
     </div>
-  );
+  </div>;
+
+  return <div className={m.surface}><MarketingNav/><main className={s.searchPage}>
+    <div className={s.searchIntro}><p className={m.eyebrow}>Your business is the starting point</p><h1>Find your business.<br/>See your website.</h1><p>Choose your Google listing. We’ll bring in your photos, hours, and contact details and put your website together.</p></div>
+    {selecting ? <section className={s.loading} aria-live="polite" aria-busy="true"><LoaderCircle size={30} className={s.spinner}/><h2>Building {selecting}’s website.</h2><p>Bringing in photos, hours, and business details…</p><button className={s.back} type="button" onClick={chooseAnother}>Back to results</button></section> : <form className={s.searchForm} onSubmit={search}>
+      <label className={s.field}>Business name<input autoComplete="organization" value={businessName} required maxLength={200} onChange={e => setBusinessName(e.target.value)} placeholder="Your business name"/></label>
+      <label className={s.field}>City or area <span className={s.optional}>(optional)</span><input autoComplete="address-level2" value={city} maxLength={100} onChange={e => setCity(e.target.value)} placeholder="Where is your business?"/></label>
+      <button className={s.primary} type="submit" disabled={busy}><Search size={18}/>{busy ? 'Finding your business…' : 'Find my business'}</button>
+      {error && <p className={s.error} role="alert">{error}</p>}{notice && <p className={s.notice} role="status">{notice}</p>}
+      {results && results.length > 0 && <section className={s.results} aria-label="Matching businesses"><h2>Choose your business</h2>{results.map(place => <button type="button" key={place.placeId} disabled={busy} onClick={() => void loadListing(place.placeId, place.name)}><span><strong>{place.name}</strong><span>{place.address}</span></span><ArrowRight size={20}/></button>)}</section>}
+      <p className={s.maps}>Business information from <a href="https://maps.google.com" target="_blank" rel="noopener noreferrer">Google Maps</a>.</p>
+      <Link className={s.manual} href={`/start?manual=1${isSiteTemplate(params.get('template')) ? '&template=' + params.get('template') : ''}`}>Can’t find your listing? Enter your details yourself <ArrowRight size={15}/></Link>
+    </form>}
+  </main><MarketingFooter/></div>;
 }
