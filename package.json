@@ -11,7 +11,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "next typegen && tsc --noEmit",
-    "test": "tsx --test tests/*.test.ts scripts/local/*.test.mjs",
+    "test": "tsx --test tests/*.test.ts scripts/local/*.test.mjs scripts/operations/*.test.mjs",
     "dev:design-lab": "AUTOLOCAL_DESIGN_LAB_ONLY=1 next dev --hostname 127.0.0.1 --port 3100",
     "test:recovery": "tsx --test tests/recovery.test.ts tests/search-business.test.ts",
     "check:config": "tsx scripts/operations/check-config.ts",
